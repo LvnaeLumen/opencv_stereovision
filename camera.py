@@ -1,5 +1,6 @@
 import cv2
 import threading
+import yaml
 
 class CameraAsyncReading(threading.Thread):
     def __init__(self, cams, height = 640, width = 480):
@@ -42,16 +43,27 @@ class CameraAsyncReading(threading.Thread):
         """ Method that runs forever """
         while not self.stop_event.is_set():
 
-            self.ret0, self.frame0 = self.video_capture_0.read()
-            self.ret1, self.frame1 = self.video_capture_1.read()
+            #self.ret0, self.frame0 = self.video_capture_0.read()
+            #self.ret1, self.frame1 = self.video_capture_1.read()
+
+            self.video_capture_0.grab()
+            self.video_capture_1.grab()
+            _, self.frame0 = self.video_capture_0.retrieve()
+            _, self.frame1 = self.video_capture_1.retrieve()
 
 
 
+    def updateFocus(self, focus):
+        self.video_capture_0.set(28, focus )
+        self.video_capture_1.set(28, focus )
 
-
-    def getFrames(self):
-        frame_left = cv2.remap(self.frame0, self.leftMapX, self.leftMapY, cv2.INTER_LANCZOS4, cv2.BORDER_CONSTANT, 0)
-        frame_right = cv2.remap(self.frame1, self.rightMapX, self.rightMapY, cv2.INTER_LANCZOS4, cv2.BORDER_CONSTANT, 0)
+    def getFrames(self, calibrate = True):
+        if(calibrate):
+            frame_left = cv2.remap(self.frame0, self.leftMapX, self.leftMapY, cv2.INTER_LANCZOS4, cv2.BORDER_CONSTANT, 0)
+            frame_right = cv2.remap(self.frame1, self.rightMapX, self.rightMapY, cv2.INTER_LANCZOS4, cv2.BORDER_CONSTANT, 0)
+        else:
+            frame_left = self.frame0
+            frame_right = self.frame1
         return [frame_left, frame_right]
     def stop(self):
         self.video_capture_0.release()
@@ -63,6 +75,16 @@ def getGrays(colored):
     gray_left = cv2.cvtColor(colored[0], cv2.COLOR_BGR2GRAY) #have to work with gray images
     gray_right = cv2.cvtColor(colored[1], cv2.COLOR_BGR2GRAY) #have to work with gray images
     return [gray_left, gray_right]
+
+def getCamsFromCameraConfig():
+
+    with open(r'cams_config.yaml') as file:
+        # The FullLoader parameter handles the conversion from YAML
+        # scalar values to Python the dictionary format
+        cams_indexes = yaml.load(file, Loader=yaml.FullLoader)
+    return cams_indexes
+
+
 
 def CalibInfo(colored, gray):
 
@@ -136,8 +158,8 @@ def CalibrateFromFile(HEIGHT, WIDTH):
                                               (HEIGHT, WIDTH), cv2.CV_16SC2)
     return leftMapX, leftMapY, rightMapX, rightMapY
 
-names = ['Left Image', 'Right Image', 'Left Gray Image', 'Right Gray Image', 'Disparity']
-def cameraAsyncOut(frames, keys):
+
+def cameraAsyncOut(frames, keys, names):
     for i in range(len(keys)):
         if keys[i]:
             cv2.imshow(names[i], frames[i])

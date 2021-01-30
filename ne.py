@@ -43,14 +43,6 @@ def maintain_aspect_ratio_resize(image, width=None, height=None, inter=cv2.INTER
 def nothing(*argv):
         pass
 
-def getCamsFromCameraConfig():
-
-    with open(r'cams_config.yaml') as file:
-        # The FullLoader parameter handles the conversion from YAML
-        # scalar values to Python the dictionary format
-        cams_indexes = yaml.load(file, Loader=yaml.FullLoader)
-    return cams_indexes
-
 
 
 def getTrackbarValues():
@@ -59,7 +51,7 @@ def getTrackbarValues():
     num_disp = cv2.getTrackbarPos('numDisparities', 'Disparity')
     block_size = cv2.getTrackbarPos('blockSize', 'Disparity')
     window_size = cv2.getTrackbarPos('windowSize', 'Disparity')
-    focus_len = cv2.getTrackbarPos('Focus', 'Disparity')
+    focus_len = cv2.getTrackbarPos('Focal length', 'Disparity')
     color_map = cv2.getTrackbarPos('Color Map', 'Disparity')
 
     block_size = int( 2 * round( block_size/ 2. ))+1 #fool protection
@@ -111,9 +103,16 @@ def main(argv=sys.argv):
     flagA_LEFTGRAY = False
     flagD_RIGHTGRAY = False
     flagW_DISPARITY = False
+    flagS_LINES = False
 
     obj_rects = []
     obj_centers = []
+
+    fs = cv2.FileStorage("extrinsics.yml", cv2.FILE_STORAGE_READ)
+
+    fn = fs.getNode("Q")
+    Q = fn.mat()
+
 
     #height, width, channels = colored_left.shape ##for object detection
     #colored_left, colored_right = getWebcamFrame()
@@ -122,12 +121,12 @@ def main(argv=sys.argv):
     cams = getCamsFromCameraConfig()
 
     #Initiate camera thread
-    load_camera_frame = CameraAsyncReading(cams)
-    frames = load_camera_frame.getFrames()
+    cameras = CameraAsyncReading(cams)
+    frames = cameras.getFrames()
     grays = getGrays(frames)
 
     #Initiate disparity threading
-    depth_map = DisparityCalc(grays)
+    depth_map = DisparityCalc(grays, Q)
     depth_map.update_image(grays)
     disp = depth_map.getDisparity()
 
@@ -138,9 +137,10 @@ def main(argv=sys.argv):
     cv2.createTrackbar('numDisparities', 'Disparity', 128, 400, trackerCallback)
     cv2.createTrackbar('blockSize', 'Disparity', 5, 135, trackerCallback)
     cv2.createTrackbar('windowSize', 'Disparity', 5, 20, trackerCallback)
-    cv2.createTrackbar('Focus', 'Disparity',  0, 255, trackerCallback)
+    cv2.createTrackbar('Focal length', 'Disparity',  0, 255, trackerCallback)
     cv2.createTrackbar('confidence', 'Disparity',  4, 10, trackerCallback)
     cv2.createTrackbar('Color Map', 'Disparity',  4, 21, trackerCallback)
+
     trackbar_values = getTrackbarValues()
 
 
@@ -148,30 +148,45 @@ def main(argv=sys.argv):
 
 
     cv2.setMouseCallback("Disparity",coords_mouse_disp,disp)
+    names = ['Left Image', 'Right Image', 'Left Gray Image', 'Right Gray Image', 'Disp', 'Lines']
 
     i = 0
+
+    fs.release()
+
     global trackerEvent
     #cv2.setMouseCallback("Filtered Color Depth",coords_mouse_disp,disp)
     while True:
 
 
-        frames= load_camera_frame.getFrames()
+        frames= cameras.getFrames()
         grays = getGrays(frames)
+
+        left_check = frames[0].copy()
+        right_check = frames[1].copy()
+
+        for line in range(0, int(left_check.shape[0]/20)): # Draw the Lines on the images Then numer of line is defines by the image Size/20
+            left_check[line*20,:]= (0,0,255)
+            right_check[line*20,:]= (0,0,255)
+
+        frames_lines =  np.hstack([left_check, right_check])
 
         depth_map.update_image(grays)
         disp = depth_map.getDisparity()
 
-        show_frames = frames[0], frames[1], grays[0], grays[1]
-        flags = [flagQ_LEFTSOURCE, flagE_RIGHTSOURCE, flagA_LEFTGRAY, flagD_RIGHTGRAY]
+        show_frames = frames[0], frames[1], grays[0], grays[1], frames_lines
+        flags = [flagQ_LEFTSOURCE, flagE_RIGHTSOURCE, flagA_LEFTGRAY, flagD_RIGHTGRAY, flagS_LINES]
 
         cv2.imshow("Disparity", disp.copy())
 
-        cameraAsyncOut(show_frames, flags )
+        cameraAsyncOut(show_frames, flags, names)
 
 
         if(trackerEvent):
             tv = getTrackbarValues()
             depth_map.update_settings(tv[0], tv[1], tv[2], tv[3], tv[4], tv[5], tv[6])
+            cameras.updateFocus(tv[5])
+
 
             trackerEvent = False
 
@@ -187,12 +202,14 @@ def main(argv=sys.argv):
             flagD_RIGHTGRAY = not flagD_RIGHTGRAY
         if ch == ord('w'): #disparity
             flagW_DISPARITY = not flagW_DISPARITY
+        if ch == ord('s'): #both with Lines
+            flagS_LINES = not flagS_LINES
 
         if ch == 27:
             break
 
 
-    load_camera_frame.stop()
+    cameras.stop()
     depth_map.stop()
 
     cv2.destroyAllWindows()

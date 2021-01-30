@@ -9,7 +9,7 @@ visual_multiplier = 6
 kernel= np.ones((3,3),np.uint8)
 
 class DisparityCalc(threading.Thread):
-    def __init__(self, gray_frames):
+    def __init__(self, gray_frames, Q):
         """ Constructor
         :type interval: int
         :param interval: Check interval, in seconds
@@ -31,6 +31,7 @@ class DisparityCalc(threading.Thread):
         self.preFilterCap = 5
         self.speckleRange  = 32
         self.colormap = 4
+        self.Q = Q
 
         self.left_image = gray_frames[0]
         self.right_image = gray_frames[1]
@@ -91,8 +92,6 @@ class DisparityCalc(threading.Thread):
             left_matcher = self.stereoSGBM
             right_matcher = cv2.ximgproc.createRightMatcher(left_matcher)
 
-
-
             wls_filter = cv2.ximgproc.createDisparityWLSFilter(matcher_left=left_matcher)
             wls_filter.setLambda(lmbda)
             wls_filter.setSigmaColor(sigma)
@@ -100,7 +99,15 @@ class DisparityCalc(threading.Thread):
             displ = left_matcher.compute(self.left_image, self.right_image)#.astype(np.float32)/16
             dispr = right_matcher.compute(self.right_image, self.left_image)  # .astype(np.float32)/16
 
-            disparitySGBM = displ
+            min = displ.min()
+            max = displ.max()
+            displ = np.uint8(6400 * (displ - min) / (max - min))
+
+            min = dispr.min()
+            max = dispr.max()
+            dispr = np.uint8(6400 * (dispr - min) / (max - min))
+
+
 
             displ = np.int16(displ)
             dispr = np.int16(dispr)
@@ -112,7 +119,9 @@ class DisparityCalc(threading.Thread):
 
             filteredImg = cv2.applyColorMap(filteredImg,self.colormap)
 
-            self.filteredImg = filteredImg#dispC
+
+
+            self.filteredImg = filteredImg
 
 
 

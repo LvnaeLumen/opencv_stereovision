@@ -35,10 +35,7 @@ def main():
     args.setdefault('--debug', './output/')
     args.setdefault('--square_size', 1.0)
     args.setdefault('--threads', 4)
-    if not img_mask:
-        img_mask = './output/??.jpg'  # default
-    else:
-        img_mask = img_mask[0]
+    img_mask = './output/*.jpg'  # default
 
     img_names = glob(img_mask)
     debug_dir = args.get('--debug')
