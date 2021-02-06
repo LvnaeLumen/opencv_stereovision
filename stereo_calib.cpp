@@ -79,6 +79,7 @@ StereoCalib(int num, Size boardSize, float squareSize, bool displayCorners = tru
     imagePoints[1].resize(nimages);
     vector<string> goodImageList;
 
+
     for( i = j = 0; i < nimages; i++ )
     {
 
@@ -87,14 +88,15 @@ StereoCalib(int num, Size boardSize, float squareSize, bool displayCorners = tru
 
             if (k == 0)
             {
-              filename = "./output/left"+std::to_string(i+1)+".jpg";
+              filename = "./output/left"+std::to_string(i)+".jpg";
             }
             else
             {
 
-              filename = "./output/right"+std::to_string(i+1)+".jpg";
+              filename = "./output/right"+std::to_string(i)+".jpg";
             }
-            //cout << filename << endl;
+
+
 
             Mat img = imread(filename, 0);
             if(img.empty())
@@ -163,10 +165,12 @@ StereoCalib(int num, Size boardSize, float squareSize, bool displayCorners = tru
                                       30, 0.01));
 
             goodImageList.push_back(filename);
+            cout << filename << endl;
 
         }
         j++;
     }
+
     cout << j << " pairs have been successfully detected.\n";
     nimages = j;
     if( nimages < 2 )
@@ -389,13 +393,13 @@ int main(int argc, char** argv)
     Size boardSize(6,9);
     string imagelistfn;
     bool showRectified;
-    cv::CommandLineParser parser(argc, argv, "{num|16|}{s|2.5|}{nr||}{help||}");
+    cv::CommandLineParser parser(argc, argv, "{num|16|}{s|1.0|}{nr||}{help||}");
     if (parser.has("help"))
         return print_help(argv);
     showRectified = !parser.has("nr");
 
 
-    float squareSize = 2.5;//parser.get<float>("s");
+    float squareSize = 1.0;//parser.get<float>("s");
     int num = parser.get<int>("num");
     num -=  1;
     if (!parser.check())

@@ -7,6 +7,7 @@ import sys
 import pathlib
 import os
 import yaml
+import json
 import threading
 from camera import *
 from disparity import *
@@ -43,7 +44,9 @@ def maintain_aspect_ratio_resize(image, width=None, height=None, inter=cv2.INTER
 def nothing(*argv):
         pass
 
+def resetTrackabarValues():
 
+    return (0,2,128,5,5,0,4,4)
 
 def getTrackbarValues():
     sgbm_mode = cv2.getTrackbarPos('SGBM mode', 'Disparity')
@@ -92,8 +95,46 @@ def redrawCams():
 
 trackerEvent = False
 
+
 def main(argv=sys.argv):
 
+
+
+
+    print('Loading parameters from config...')
+
+
+
+    ### OPENCV BUGGED
+    #fs = cv2.FileStorage('config.yml', cv2.FILE_STORAGE_READ)
+    # sgbm_mode = fs.getNode("sgbm_mode").mat()
+    # numDisparities = fs.getNode('numDisparities').mat()
+    # blockSize = fs.getNode('blockSize').mat()
+    # windowSize = fs.getNode('windowSize').mat()
+    # focal_length = fs.getNode('focal_length').mat()
+    # confidence = fs.getNode('confidence').mat()
+    # color_map = fs.getNode('color_map').mat()
+    #fs.release()
+
+    with open('config.json', 'r') as f:
+        config_dict = json.load(f)
+
+
+    print ('Depth map settings has been loaded from the config.json')
+
+    cv2.namedWindow('Disparity')
+    cv2.createTrackbar('SGBM mode', 'Disparity', config_dict['sgbm_mode'], 3, trackerCallback)
+    cv2.createTrackbar('minDisparity', 'Disparity', config_dict['minDisparity'], 128, trackerCallback)
+    cv2.createTrackbar('numDisparities', 'Disparity', config_dict['numDisparities'], 400, trackerCallback)
+    cv2.createTrackbar('blockSize', 'Disparity', config_dict['blockSize'], 135, trackerCallback)
+    cv2.createTrackbar('windowSize', 'Disparity', config_dict['windowSize'], 20, trackerCallback)
+    cv2.createTrackbar('Focal length', 'Disparity',  config_dict['focal_length'], 255, trackerCallback)
+    cv2.createTrackbar('Color Map', 'Disparity',  config_dict['color_map'] , 21, trackerCallback)
+
+    trackbar_values = getTrackbarValues()
+
+    print("v4l2-ctl -d /dev/video0 --set-ctrl=power_line_frequency=1")
+    print("v4l2-ctl -d /dev/video2 --set-ctrl=power_line_frequency=1")
 
 
     #displaying on the depth map
@@ -113,6 +154,8 @@ def main(argv=sys.argv):
     fn = fs.getNode("Q")
     Q = fn.mat()
 
+    fs.release()
+
 
     #height, width, channels = colored_left.shape ##for object detection
     #colored_left, colored_right = getWebcamFrame()
@@ -131,20 +174,6 @@ def main(argv=sys.argv):
     disp = depth_map.getDisparity()
 
 
-    cv2.namedWindow('Disparity')
-    cv2.createTrackbar('SGBM mode', 'Disparity', 0, 3, trackerCallback)
-    cv2.createTrackbar('minDisparity', 'Disparity', 2, 128, trackerCallback)
-    cv2.createTrackbar('numDisparities', 'Disparity', 128, 400, trackerCallback)
-    cv2.createTrackbar('blockSize', 'Disparity', 5, 135, trackerCallback)
-    cv2.createTrackbar('windowSize', 'Disparity', 5, 20, trackerCallback)
-    cv2.createTrackbar('Focal length', 'Disparity',  0, 255, trackerCallback)
-    cv2.createTrackbar('confidence', 'Disparity',  4, 10, trackerCallback)
-    cv2.createTrackbar('Color Map', 'Disparity',  4, 21, trackerCallback)
-
-    trackbar_values = getTrackbarValues()
-
-
-    print("v4l2-ctl -d /dev/video2 --set-ctrl=power_line_frequency=1")
 
 
     cv2.setMouseCallback("Disparity",coords_mouse_disp,disp)
@@ -152,7 +181,7 @@ def main(argv=sys.argv):
 
     i = 0
 
-    fs.release()
+
 
     global trackerEvent
     #cv2.setMouseCallback("Filtered Color Depth",coords_mouse_disp,disp)
@@ -204,6 +233,15 @@ def main(argv=sys.argv):
             flagW_DISPARITY = not flagW_DISPARITY
         if ch == ord('s'): #both with Lines
             flagS_LINES = not flagS_LINES
+        if ch == ord('t'): #reset trackbar
+            tr = resetTrackabarValues()
+            cv2.setTrackbarPos('SGBM mode', 'Disparity', tr[0])
+            cv2.setTrackbarPos('minDisparity', 'Disparity', tr[1])
+            cv2.setTrackbarPos('numDisparities', 'Disparity',  tr[2])
+            cv2.setTrackbarPos('blockSize', 'Disparity', tr[3])
+            cv2.setTrackbarPos('windowSize', 'Disparity', tr[4])
+            cv2.setTrackbarPos('Focal length', 'Disparity',  tr[5])
+            cv2.setTrackbarPos('Color Map', 'Disparity', tr[6])
 
         if ch == 27:
             break
@@ -211,6 +249,31 @@ def main(argv=sys.argv):
 
     cameras.stop()
     depth_map.stop()
+
+    # fs = cv2.FileStorage('config.yml', cv2.FILE_STORAGE_WRITE)
+    # fs.write('sgbm_mode',sgbm_mode)
+    # fs.write('minDisparity',minDisparity)
+    # fs.write('numDisparities',numDisparities)
+    # fs.write('blockSize',blockSize)
+    # fs.write('windowSize',windowSize)
+    # fs.write('focal_length',focal_length)
+    # fs.write('confidence',confidence)
+    # fs.write('color_map',color_map)
+    # fs.release()
+
+
+    tv = getTrackbarValues()
+    conf =    {
+        'sgbm_mode': tv[0],
+        'minDisparity':tv[1],
+        'numDisparities':tv[2],
+        'blockSize':tv[3],
+        'windowSize':tv[4],
+        'focal_length':tv[5],
+        'color_map':tv[6]
+    }
+    with open(r'config.json', 'w') as f:
+        json.dump(conf, f)
 
     cv2.destroyAllWindows()
     sys.exit()

@@ -2,6 +2,7 @@ import cv2
 import threading
 import yaml
 
+
 class CameraAsyncReading(threading.Thread):
     def __init__(self, cams, height = 640, width = 480):
         """ Constructor
@@ -45,6 +46,7 @@ class CameraAsyncReading(threading.Thread):
 
             #self.ret0, self.frame0 = self.video_capture_0.read()
             #self.ret1, self.frame1 = self.video_capture_1.read()
+
 
             self.video_capture_0.grab()
             self.video_capture_1.grab()

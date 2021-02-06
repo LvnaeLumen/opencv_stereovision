@@ -99,14 +99,14 @@ class DisparityCalc(threading.Thread):
             displ = left_matcher.compute(self.left_image, self.right_image)#.astype(np.float32)/16
             dispr = right_matcher.compute(self.right_image, self.left_image)  # .astype(np.float32)/16
 
-            min = displ.min()
-            max = displ.max()
-            displ = np.uint8(6400 * (displ - min) / (max - min))
-
-            min = dispr.min()
-            max = dispr.max()
-            dispr = np.uint8(6400 * (dispr - min) / (max - min))
-
+            # min = displ.min()
+            # max = displ.max()
+            # displ = np.uint8(6400 * (displ - min) / (max - min))
+            #
+            # min = dispr.min()
+            # max = dispr.max()
+            # dispr = np.uint8(6400 * (dispr - min) / (max - min))
+            #
 
 
             displ = np.int16(displ)
