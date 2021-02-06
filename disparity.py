@@ -36,6 +36,11 @@ class DisparityCalc(threading.Thread):
         self.left_image = gray_frames[0]
         self.right_image = gray_frames[1]
 
+        self.lmbda = 80000
+        self.sigma = 1.8
+        self.visual_multiplier = 6
+
+
         self.stereoSGBM = cv2.StereoSGBM_create(
         minDisparity = self.minDisparity,
         numDisparities=self.numDisparities,
@@ -59,13 +64,18 @@ class DisparityCalc(threading.Thread):
         #thread.daemon = True                            # Daemonize thread
         thread.start()                                  # Start the execution
 
-    def update_settings(self, mode, minDisparity, numDisparities, blockSize, windowSize, focus_len, color_map):
+    def update_settings(self, mode, minDisparity, numDisparities,
+            blockSize, windowSize, focus_len, color_map, lmbda, sigma, visual_multiplier):
         self.minDisparity = minDisparity
         self.numDisparities = numDisparities
         self.blockSize = blockSize
         self.windowSize = windowSize
         self.mode = mode
         self.colormap = color_map
+
+        self.lmbda = lmbda
+        self.sigma = sigma
+        self.visual_multiplier = visual_multiplier
 
         self.stereoSGBM = cv2.StereoSGBM_create(
         minDisparity = self.minDisparity,
