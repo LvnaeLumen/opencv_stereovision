@@ -17,7 +17,6 @@ class CameraAsyncReading(threading.Thread):
         self.HEIGHT = height
         self.WIDTH = width
 
-
         self.video_capture_0 = cv2.VideoCapture(cams[0], cv2.CAP_V4L2)
         self.video_capture_0.set(cv2.CAP_PROP_FRAME_WIDTH, self.HEIGHT)
         self.video_capture_0.set(cv2.CAP_PROP_FRAME_HEIGHT, self.WIDTH)
@@ -72,6 +71,10 @@ class CameraAsyncReading(threading.Thread):
         self.video_capture_1.release()
         self.stop_event.set()
         self._running = False
+    def swapCameras(self):
+        video_capture_buff = self.video_capture_1
+        self.video_capture_1 = self.video_capture_0
+        self.video_capture_0 = video_capture_buff
 
 def getGrays(colored):
     gray_left = cv2.cvtColor(colored[0], cv2.COLOR_BGR2GRAY) #have to work with gray images

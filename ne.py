@@ -234,6 +234,7 @@ def main(argv=sys.argv):
         if ch == ord('s'): #both with Lines
             flagS_LINES = not flagS_LINES
         if ch == ord('t'): #reset trackbar
+            print("Reset trackbar cameras")
             tr = resetTrackabarValues()
             cv2.setTrackbarPos('SGBM mode', 'Disparity', tr[0])
             cv2.setTrackbarPos('minDisparity', 'Disparity', tr[1])
@@ -242,6 +243,9 @@ def main(argv=sys.argv):
             cv2.setTrackbarPos('windowSize', 'Disparity', tr[4])
             cv2.setTrackbarPos('Focal length', 'Disparity',  tr[5])
             cv2.setTrackbarPos('Color Map', 'Disparity', tr[6])
+        if ch == ord('r'): #swap cameras
+            print("Swap cameras")
+            cameras.swapCameras()
 
         if ch == 27:
             break
