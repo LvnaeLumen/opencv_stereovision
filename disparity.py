@@ -5,7 +5,7 @@ import numpy as np
 
 lmbda = 80000
 sigma = 1.8
-visual_multiplier = 6
+
 kernel= np.ones((3,3),np.uint8)
 
 class DisparityCalc(threading.Thread):
@@ -38,7 +38,7 @@ class DisparityCalc(threading.Thread):
 
         self.lmbda = 80000
         self.sigma = 1.8
-        self.visual_multiplier = 6
+
 
 
         self.stereoSGBM = cv2.StereoSGBM_create(
@@ -56,6 +56,15 @@ class DisparityCalc(threading.Thread):
         )
 
         self.filteredImg = np.zeros((640, 480, 3), np.uint8)
+        self.disparity_left  = np.zeros((640, 480, 3), np.uint8)
+        self.depth = np.zeros((640, 480, 3), np.uint8)
+
+        fs = cv2.FileStorage("extrinsics.yml", cv2.FILE_STORAGE_READ)
+        fn = fs.getNode("Q")
+        Q = fn.mat()
+        fs.release()
+
+        self.Q = Q
 
 
 
@@ -65,7 +74,7 @@ class DisparityCalc(threading.Thread):
         thread.start()                                  # Start the execution
 
     def update_settings(self, mode, minDisparity, numDisparities,
-            blockSize, windowSize, focus_len, color_map, lmbda, sigma, visual_multiplier):
+            blockSize, windowSize, focus_len, color_map, lmbda, sigma):
         self.minDisparity = minDisparity
         self.numDisparities = numDisparities
         self.blockSize = blockSize
@@ -75,7 +84,7 @@ class DisparityCalc(threading.Thread):
 
         self.lmbda = lmbda
         self.sigma = sigma
-        self.visual_multiplier = visual_multiplier
+
 
         self.stereoSGBM = cv2.StereoSGBM_create(
         minDisparity = self.minDisparity,
@@ -103,8 +112,8 @@ class DisparityCalc(threading.Thread):
             right_matcher = cv2.ximgproc.createRightMatcher(left_matcher)
 
             wls_filter = cv2.ximgproc.createDisparityWLSFilter(matcher_left=left_matcher)
-            wls_filter.setLambda(lmbda)
-            wls_filter.setSigmaColor(sigma)
+            wls_filter.setLambda(self.lmbda)
+            wls_filter.setSigmaColor(self.sigma)
 
             displ = left_matcher.compute(self.left_image, self.right_image)#.astype(np.float32)/16
             dispr = right_matcher.compute(self.right_image, self.left_image)  # .astype(np.float32)/16
@@ -122,22 +131,54 @@ class DisparityCalc(threading.Thread):
             displ = np.int16(displ)
             dispr = np.int16(dispr)
 
-            filteredImg = wls_filter.filter(displ, self.left_image, None, dispr)  # important to put "imgL" here!!!
 
-            filteredImg = cv2.normalize(src=filteredImg, dst=filteredImg, beta=0, alpha=255, norm_type=cv2.NORM_MINMAX);
+            local_max = displ.max()
+            local_min = displ.min()
+            disparity_grayscale_l = (displ-local_min)*(65535.0/(local_max-local_min))
+            disparity_fixtype_l = cv2.convertScaleAbs(disparity_grayscale_l, alpha=(255.0/65535.0))
+            disparity_color_l = cv2.applyColorMap(disparity_fixtype_l, cv2.COLORMAP_JET)
+
+            local_max = dispr.max()
+            local_min = dispr.min()
+            disparity_grayscale_r = (dispr-local_min)*(65535.0/(local_max-local_min))
+            disparity_fixtype_r = cv2.convertScaleAbs(disparity_grayscale_r, alpha=(255.0/65535.0))
+            disparity_color_r = cv2.applyColorMap(disparity_fixtype_r, cv2.COLORMAP_JET)
+
+            depth = cv2.reprojectImageTo3D(displ, self.Q)
+            #depth = reshape(depth, [], 3);
+
+
+            filteredImg = wls_filter.filter(displ, self.left_image, None, dispr)
+            #conf_map = wls_filter.getConfidenceMap()
+            #ROI = wls_filter.getROI()
+
+            #filteredImg = wls_filter.filter(displ, self.left_image, None, dispr, ROI)
+
+
+            filteredImg = cv2.normalize(src=filteredImg, dst=filteredImg, beta=1,
+            alpha=255, norm_type=cv2.NORM_MINMAX);
             filteredImg = np.uint8(filteredImg)
 
             filteredImg = cv2.applyColorMap(filteredImg,self.colormap)
 
 
 
+            self.disparity_left = disparity_color_l
             self.filteredImg = filteredImg
+            self.depth = depth
 
 
 
 
     def getDisparity(self):
+        return self.disparity_left
+
+    def getFilteredImg(self):
         return self.filteredImg
+
+    def getDepthMap(self):
+        return self.depth
+
 
 
     def stop(self):

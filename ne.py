@@ -86,9 +86,10 @@ def getTrackbarValuesRaw():
 
     window_size = cv2.getTrackbarPos('WLS lambda', 'Disparity')
     wls_sigma= cv2.getTrackbarPos('WLS sigma', 'Disparity')
-    wls_vismult = cv2.getTrackbarPos('WLS vismult', 'Disparity')
 
-    return (sgbm_mode, min_disp, num_disp, block_size, window_size, focus_len, color_map, window_size, wls_sigma, wls_vismult)
+
+    return (sgbm_mode, min_disp, num_disp, block_size, window_size,
+     focus_len, color_map, window_size, wls_sigma)
 
 def trackerCallback(*argv):
     global trackerEvent
@@ -157,7 +158,7 @@ def main(argv=sys.argv):
     cv2.createTrackbar('Color Map', 'Disparity',  config_dict['color_map'] , 21, trackerCallback)
     cv2.createTrackbar('WLS lambda', 'Disparity',  config_dict['wls_lambda'] , 1000, trackerCallback)
     cv2.createTrackbar('WLS sigma', 'Disparity',  config_dict['wls_sigma'] , 20, trackerCallback)
-    cv2.createTrackbar('WLS vismult', 'Disparity',  config_dict['wls_vismult'] , 20, trackerCallback)
+
 
     trackbar_values = getTrackbarValues()
 
@@ -173,6 +174,7 @@ def main(argv=sys.argv):
     flagD_RIGHTGRAY = False
     flagW_DISPARITY = False
     flagS_LINES = False
+    flagC_CALIB = True
 
     obj_rects = []
     obj_centers = []
@@ -213,10 +215,11 @@ def main(argv=sys.argv):
 
     global trackerEvent
     #cv2.setMouseCallback("Filtered Color Depth",coords_mouse_disp,disp)
+    #frames= cameras.getFrames(flagC_CALIB)
     while True:
 
 
-        frames= cameras.getFrames()
+        frames= cameras.getFrames(flagC_CALIB)
         grays = getGrays(frames)
 
         left_check = frames[0].copy()
@@ -230,18 +233,24 @@ def main(argv=sys.argv):
 
         depth_map.update_image(grays)
         disp = depth_map.getDisparity()
+        fim = depth_map.getFilteredImg()
+        depth = depth_map.getDepthMap()
 
         show_frames = frames[0], frames[1], grays[0], grays[1], frames_lines
         flags = [flagQ_LEFTSOURCE, flagE_RIGHTSOURCE, flagA_LEFTGRAY, flagD_RIGHTGRAY, flagS_LINES]
 
-        cv2.imshow("Disparity", disp.copy())
+        disps=  np.hstack([disp, fim])
+        # plt.imshow(disp, cmap='plasma')
+        # plt.colorbar()
+        # plt.show()
+        cv2.imshow("Disparity", disps)
 
         cameraAsyncOut(show_frames, flags, names)
 
 
         if(trackerEvent):
             tv = getTrackbarValues()
-            depth_map.update_settings(tv[0], tv[1], tv[2], tv[3], tv[4], tv[5], tv[6], tv[7], tv[8], tv[9])
+            depth_map.update_settings(tv[0], tv[1], tv[2], tv[3], tv[4], tv[5], tv[6], tv[7], tv[8])
             cameras.updateFocus(tv[5])
 
 
@@ -261,16 +270,18 @@ def main(argv=sys.argv):
             flagW_DISPARITY = not flagW_DISPARITY
         if ch == ord('s'): #both with Lines
             flagS_LINES = not flagS_LINES
+        if ch == ord('c'): #use calibration
+            flagC_CALIB = not flagC_CALIB
         if ch == ord('t'): #reset trackbar
             print("Reset trackbar cameras")
-            tr = resetTrackabarValuesRaw()
-            cv2.setTrackbarPos('SGBM mode', 'Disparity', tr[0])
-            cv2.setTrackbarPos('minDisparity', 'Disparity', tr[1])
-            cv2.setTrackbarPos('numDisparities', 'Disparity',  tr[2])
-            cv2.setTrackbarPos('blockSize', 'Disparity', tr[3])
-            cv2.setTrackbarPos('windowSize', 'Disparity', tr[4])
-            cv2.setTrackbarPos('Focal length', 'Disparity',  tr[5])
-            cv2.setTrackbarPos('Color Map', 'Disparity', tr[6])
+            #tr = resetTrackabarValuesRaw()
+            cv2.setTrackbarPos('SGBM mode', 'Disparity', 2)
+            cv2.setTrackbarPos('minDisparity', 'Disparity', 2)
+            cv2.setTrackbarPos('numDisparities', 'Disparity',  128)
+            cv2.setTrackbarPos('blockSize', 'Disparity', 5)
+            cv2.setTrackbarPos('windowSize', 'Disparity', 5)
+            cv2.setTrackbarPos('Focal length', 'Disparity',  0)
+            cv2.setTrackbarPos('Color Map', 'Disparity', 4)
         if ch == ord('r'): #swap cameras
             print("Swap cameras")
             cameras.swapCameras()
@@ -304,8 +315,7 @@ def main(argv=sys.argv):
         'focal_length':tv[5],
         'color_map':tv[6],
         'wls_lambda':tv[7],
-        'wls_sigma':tv[8],
-        'wls_vismult':tv[9]
+        'wls_sigma':tv[8]
     }
     with open(r'config.json', 'w') as f:
         json.dump(conf, f)
