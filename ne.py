@@ -206,7 +206,7 @@ def main(argv=sys.argv):
 
 
 
-    cv2.setMouseCallback("Disparity",coords_mouse_disp,disp)
+    cv2.setMouseCallback("Disparity",depth_map.coords_mouse_disp,disp)
     names = ['Left Image', 'Right Image', 'Left Gray Image', 'Right Gray Image', 'Disp', 'Lines']
 
     i = 0
@@ -239,7 +239,8 @@ def main(argv=sys.argv):
         show_frames = frames[0], frames[1], grays[0], grays[1], frames_lines
         flags = [flagQ_LEFTSOURCE, flagE_RIGHTSOURCE, flagA_LEFTGRAY, flagD_RIGHTGRAY, flagS_LINES]
 
-        disps=  np.hstack([disp, fim])
+        disps = fim
+        #disps=  np.hstack([disp, fim])
         # plt.imshow(disp, cmap='plasma')
         # plt.colorbar()
         # plt.show()

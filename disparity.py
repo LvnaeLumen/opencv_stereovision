@@ -55,9 +55,9 @@ class DisparityCalc(threading.Thread):
         mode = cv2.STEREO_SGBM_MODE_SGBM_3WAY
         )
 
-        self.filteredImg = np.zeros((640, 480, 3), np.uint8)
-        self.disparity_left  = np.zeros((640, 480, 3), np.uint8)
-        self.depth = np.zeros((640, 480, 3), np.uint8)
+        self.filteredImg = np.zeros((640, 480, 3), np.int16)
+        self.disparity_left  = np.zeros((640, 480, 3), np.int16)
+        self.depth = np.zeros((640, 480, 3), np.int16)
 
         fs = cv2.FileStorage("extrinsics.yml", cv2.FILE_STORAGE_READ)
         fn = fs.getNode("Q")
@@ -118,28 +118,23 @@ class DisparityCalc(threading.Thread):
             displ = left_matcher.compute(self.left_image, self.right_image)#.astype(np.float32)/16
             dispr = right_matcher.compute(self.right_image, self.left_image)  # .astype(np.float32)/16
 
-            # min = displ.min()
-            # max = displ.max()
-            # displ = np.uint8(6400 * (displ - min) / (max - min))
-            #
-            # min = dispr.min()
-            # max = dispr.max()
-            # dispr = np.uint8(6400 * (dispr - min) / (max - min))
-            #
-
-
             displ = np.int16(displ)
             dispr = np.int16(dispr)
+
+            #displ= ((displ.astype(np.float32)/ 16)-self.minDisparity)/self.numDisparities # Calculation allowing us to have 0 for the most distant object able to detect
+            #dispr= ((dispr.astype(np.float32)/ 16)-self.minDisparity)/self.numDisparities # Calculation allowing us to have 0 for the most distant object able to detect
 
 
             local_max = displ.max()
             local_min = displ.min()
+            #disparity_grayscale_l = displ
             disparity_grayscale_l = (displ-local_min)*(65535.0/(local_max-local_min))
             disparity_fixtype_l = cv2.convertScaleAbs(disparity_grayscale_l, alpha=(255.0/65535.0))
             disparity_color_l = cv2.applyColorMap(disparity_fixtype_l, cv2.COLORMAP_JET)
 
             local_max = dispr.max()
             local_min = dispr.min()
+            #disparity_grayscale_r = dispr
             disparity_grayscale_r = (dispr-local_min)*(65535.0/(local_max-local_min))
             disparity_fixtype_r = cv2.convertScaleAbs(disparity_grayscale_r, alpha=(255.0/65535.0))
             disparity_color_r = cv2.applyColorMap(disparity_fixtype_r, cv2.COLORMAP_JET)
@@ -147,11 +142,10 @@ class DisparityCalc(threading.Thread):
             depth = cv2.reprojectImageTo3D(displ, self.Q)
             #depth = reshape(depth, [], 3);
 
-
+            filteredImg = wls_filter.filter(disparity_fixtype_l, self.left_image, None, disparity_fixtype_r)
             filteredImg = wls_filter.filter(displ, self.left_image, None, dispr)
             #conf_map = wls_filter.getConfidenceMap()
             #ROI = wls_filter.getROI()
-
             #filteredImg = wls_filter.filter(displ, self.left_image, None, dispr, ROI)
 
 
@@ -162,6 +156,11 @@ class DisparityCalc(threading.Thread):
             filteredImg = cv2.applyColorMap(filteredImg,self.colormap)
 
 
+            #OPTIONAL
+            # depth= ((depth.astype(np.float32)/ 16)-self.minDisparity)/self.numDisparities
+            # depth = cv2.morphologyEx(depth,cv2.MORPH_CLOSE, kernel)
+            # depth= (depth-depth.min())*255
+            # depth= depth.astype(np.int16)
 
             self.disparity_left = disparity_color_l
             self.filteredImg = filteredImg
@@ -186,24 +185,18 @@ class DisparityCalc(threading.Thread):
         self.stop_event.set()
         self._running = False
 
-def coords_mouse_disp(event,x,y,flags,param):
-    if event == cv2.EVENT_LBUTTONDBLCLK:
-        #print x,y,disp[y,x],filteredImg[y,x]
-        """
-				p p p
-				p p p
-				p p p
-        """
-        average=0
-        for u in range (-1,2):     # (-1 0 1)
-            for v in range (-1,2): # (-1 0 1)
-                average += param[y+u,x+v]
-        average=average/9
-        Distance= -593.97*average**(3) + 1506.8*average**(2) - 1373.1*average + 522.06
-        Distance= np.around(Distance*0.01,decimals=2)
-        print('Distance: '+ str(Distance)+' m')
 
-        print('Average: '+ str(average))
-        #counterdist = int(input("ingresa distancia (cm): "))
-        #print(counterdist)
-        #ws.append([counterdist, average])
+    def coords_mouse_disp(self, event,x,y,flags,param): #Function measuring distance to object
+        if event == cv2.EVENT_LBUTTONDBLCLK: #double leftclick on disparity map (control windwo)
+            #print (x,y,disparitySGBM[y,x],sgbm_filteredImg[y,x])
+
+            average=0
+            for u in range (-1,2):
+                for v in range (-1,2):
+                    average += self.filteredImg[y+u,x+v] #using SGBM in area
+            average=average/9
+            distance= -593.97*average**(3) + 1506.8*average**(2) - 1373.1*average + 522.06
+            #cubic equation from source (experimental)
+            distance= np.around(distance*0.01,decimals=2)
+            print(distance)
+            #return distance

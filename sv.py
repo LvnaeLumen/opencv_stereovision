@@ -10,12 +10,8 @@ def nothing(*argv):
         pass
 #finding distance to point
 def measure_distance(x,y):
-    for u in range (-1,2):
-        for v in range (-1,2):
-            average += disparitySGBM[y+u,x+v] #using SGBM in area
-    average=average/9
-    return (focus_len/average)
-    '''average=0
+    
+    average=0
     for u in range (-1,2):
         for v in range (-1,2):
             average += disparitySGBM[y+u,x+v] #using SGBM in area
@@ -24,7 +20,7 @@ def measure_distance(x,y):
     #cubic equation from source (experimental)
     distance= np.around(distance*0.01,decimals=2)
     return distance
-    '''
+
 
 
 def coords_mouse_disp(event,x,y,flags,param): #Function measuring distance to object
