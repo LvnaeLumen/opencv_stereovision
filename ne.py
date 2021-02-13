@@ -207,7 +207,7 @@ def main(argv=sys.argv):
 
 
     cv2.setMouseCallback("Disparity",depth_map.coords_mouse_disp,disp)
-    names = ['Left Image', 'Right Image', 'Left Gray Image', 'Right Gray Image', 'Disp', 'Lines']
+    names = ['Left Image', 'Right Image', 'Left Gray Image', 'Right Gray Image', 'Disp', 'Lines', 'Disparity']
 
     i = 0
 
@@ -236,15 +236,15 @@ def main(argv=sys.argv):
         fim = depth_map.getFilteredImg()
         depth = depth_map.getDepthMap()
 
-        show_frames = frames[0], frames[1], grays[0], grays[1], frames_lines
-        flags = [flagQ_LEFTSOURCE, flagE_RIGHTSOURCE, flagA_LEFTGRAY, flagD_RIGHTGRAY, flagS_LINES]
+        show_frames = frames[0], frames[1], grays[0], grays[1], frames_lines, disp
+        flags = [flagQ_LEFTSOURCE, flagE_RIGHTSOURCE, flagA_LEFTGRAY, flagD_RIGHTGRAY, flagS_LINES, flagW_DISPARITY]
 
-        disps = fim
+
         #disps=  np.hstack([disp, fim])
         # plt.imshow(disp, cmap='plasma')
         # plt.colorbar()
         # plt.show()
-        cv2.imshow("Disparity", disps)
+        cv2.imshow("Disparity", fim)
 
         cameraAsyncOut(show_frames, flags, names)
 
