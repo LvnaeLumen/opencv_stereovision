@@ -3,6 +3,7 @@ import threading
 import yaml
 
 
+
 class CameraAsyncReading(threading.Thread):
     def __init__(self, cams, height = 640, width = 480):
         """ Constructor
@@ -46,7 +47,6 @@ class CameraAsyncReading(threading.Thread):
             #self.ret0, self.frame0 = self.video_capture_0.read()
             #self.ret1, self.frame1 = self.video_capture_1.read()
 
-
             self.video_capture_0.grab()
             self.video_capture_1.grab()
             _, self.frame0 = self.video_capture_0.retrieve()
@@ -54,17 +54,26 @@ class CameraAsyncReading(threading.Thread):
 
 
 
-    def updateFocus(self, focus):
-        self.video_capture_0.set(28, focus )
-        self.video_capture_1.set(28, focus )
+    def updateFocus(self, tv):
+        self.video_capture_0.set(28, tv['focus_len'] )
+        self.video_capture_1.set(28, tv['focus_len'] )
+
+        
+
+
+
 
     def getFrames(self, calibrate = True):
+
         if(calibrate):
             frame_left = cv2.remap(self.frame0, self.leftMapX, self.leftMapY, cv2.INTER_LANCZOS4, cv2.BORDER_CONSTANT, 0)
             frame_right = cv2.remap(self.frame1, self.rightMapX, self.rightMapY, cv2.INTER_LANCZOS4, cv2.BORDER_CONSTANT, 0)
         else:
             frame_left = self.frame0
             frame_right = self.frame1
+
+
+
         return [frame_left, frame_right]
     def stop(self):
         self.video_capture_0.release()

@@ -20,16 +20,16 @@ class DisparityCalc(threading.Thread):
 
         #INIT
         self.windowSize = 5
-        self.minDisparity = 2
+        self.minDisparity = -128
         self.numDisparities = 128
         self.blockSize = 5
         self.P1 = 8*3*self.windowSize**2
         self.P2 = 32*3*self.windowSize**2
         self.disp12MaxDiff = 5
-        self.uniquenessRatio = 10
-        self.speckleWindowSize =100
-        self.preFilterCap = 5
-        self.speckleRange  = 32
+        self.uniquenessRatio = 5
+        self.speckleWindowSize =2
+        self.preFilterCap = 60
+        self.speckleRange  = 1
         self.colormap = 4
         self.Q = Q
 
@@ -55,7 +55,7 @@ class DisparityCalc(threading.Thread):
         mode = cv2.STEREO_SGBM_MODE_SGBM_3WAY
         )
 
-        self.filteredImg = np.zeros((640, 480, 3), np.int16)
+        self.filtered_depth = np.zeros((640, 480, 3), np.int16)
         self.disparity_left  = np.zeros((640, 480, 3), np.int16)
         self.depth = np.zeros((640, 480, 3), np.int16)
 
@@ -73,17 +73,27 @@ class DisparityCalc(threading.Thread):
         #thread.daemon = True                            # Daemonize thread
         thread.start()                                  # Start the execution
 
-    def update_settings(self, mode, minDisparity, numDisparities,
-            blockSize, windowSize, focus_len, color_map, lmbda, sigma):
-        self.minDisparity = minDisparity
-        self.numDisparities = numDisparities
-        self.blockSize = blockSize
-        self.windowSize = windowSize
-        self.mode = mode
-        self.colormap = color_map
+    def update_settings(self, settings):
 
-        self.lmbda = lmbda
-        self.sigma = sigma
+        self.minDisparity = settings['min_disp']
+        self.numDisparities = settings['num_disp']
+        self.blockSize = settings['block_size']
+        self.windowSize = settings['window_size']
+        self.mode = settings['sgbm_mode']
+        self.colormap = settings['color_map']
+
+        self.lmbda = settings['wls_lambda']
+        self.sigma = settings['wls_sigma']
+
+        self.disp12MaxDiff = settings['disp12MaxDiff']
+        self.uniquenessRatio = settings['uniquenessRatio']
+        self.speckleWindowSize  = settings['speckleWindowSize']
+        self.speckleRange = settings['speckleRange']
+        self.preFilterCap = settings['preFilterCap']
+
+
+        self.P1 = 8*3*self.windowSize**2
+        self.P2 = 32*3*self.windowSize**2
 
 
         self.stereoSGBM = cv2.StereoSGBM_create(
@@ -96,8 +106,10 @@ class DisparityCalc(threading.Thread):
         uniquenessRatio = self.uniquenessRatio,
         speckleWindowSize = self.speckleWindowSize,
         speckleRange = self.speckleRange,
+        preFilterCap = self.preFilterCap,
         mode = self.mode
         )
+
     def update_image(self, gray_frames):
         self.left_image = gray_frames[0]
         self.right_image = gray_frames[1]
@@ -118,8 +130,8 @@ class DisparityCalc(threading.Thread):
             displ = left_matcher.compute(self.left_image, self.right_image)#.astype(np.float32)/16
             dispr = right_matcher.compute(self.right_image, self.left_image)  # .astype(np.float32)/16
 
-            displ = np.int16(displ)
-            dispr = np.int16(dispr)
+            #displ = np.int16(displ)
+            #dispr = np.int16(dispr)
 
             #displ= ((displ.astype(np.float32)/ 16)-self.minDisparity)/self.numDisparities # Calculation allowing us to have 0 for the most distant object able to detect
             #dispr= ((dispr.astype(np.float32)/ 16)-self.minDisparity)/self.numDisparities # Calculation allowing us to have 0 for the most distant object able to detect
@@ -127,33 +139,28 @@ class DisparityCalc(threading.Thread):
 
             local_max = displ.max()
             local_min = displ.min()
-            #disparity_grayscale_l = displ
-            disparity_grayscale_l = (displ-local_min)*(65535.0/(local_max-local_min))
+            disparity_grayscale_l = displ
+            #disparity_grayscale_l = (displ-local_min)*(65535.0/(local_max-local_min))
             disparity_fixtype_l = cv2.convertScaleAbs(disparity_grayscale_l, alpha=(255.0/65535.0))
             disparity_color_l = cv2.applyColorMap(disparity_fixtype_l, cv2.COLORMAP_JET)
 
             local_max = dispr.max()
             local_min = dispr.min()
-            #disparity_grayscale_r = dispr
-            disparity_grayscale_r = (dispr-local_min)*(65535.0/(local_max-local_min))
+            disparity_grayscale_r = dispr
+            #disparity_grayscale_r = (dispr-local_min)*(65535.0/(local_max-local_min))
             disparity_fixtype_r = cv2.convertScaleAbs(disparity_grayscale_r, alpha=(255.0/65535.0))
             disparity_color_r = cv2.applyColorMap(disparity_fixtype_r, cv2.COLORMAP_JET)
 
             depth = cv2.reprojectImageTo3D(displ, self.Q)
             #depth = reshape(depth, [], 3);
 
-            filteredImg = wls_filter.filter(disparity_fixtype_l, self.left_image, None, disparity_fixtype_r)
-            filteredImg = wls_filter.filter(displ, self.left_image, None, dispr)
+
+            #filtered_depth = wls_filter.filter(displ, self.left_image, None, dispr)
             #conf_map = wls_filter.getConfidenceMap()
             #ROI = wls_filter.getROI()
-            #filteredImg = wls_filter.filter(displ, self.left_image, None, dispr, ROI)
+            #filtered_depth = wls_filter.filter(displ, self.left_image, None, dispr, ROI)
 
 
-            filteredImg = cv2.normalize(src=filteredImg, dst=filteredImg, beta=1,
-            alpha=255, norm_type=cv2.NORM_MINMAX);
-            filteredImg = np.uint8(filteredImg)
-
-            filteredImg = cv2.applyColorMap(filteredImg,self.colormap)
 
 
             #OPTIONAL
@@ -162,8 +169,23 @@ class DisparityCalc(threading.Thread):
             # depth= (depth-depth.min())*255
             # depth= depth.astype(np.int16)
 
+            local_max = displ.max()
+            local_min = displ.min()
+            disparity_grayscale_l = (displ-local_min)*(65535.0/(local_max-local_min))
+            disparity_fixtype_l = cv2.convertScaleAbs(disparity_grayscale_l, alpha=(255.0/65535.0))
+            disparity_color_l = cv2.applyColorMap(disparity_fixtype_l, self.colormap)
+
+            filtered_depth = wls_filter.filter(disparity_fixtype_l, self.left_image, None, disparity_fixtype_r)
+            filtered_depth = cv2.normalize(src=filtered_depth, dst=filtered_depth, beta=1,
+            alpha=255, norm_type=cv2.NORM_MINMAX);
+            filtered_depth = np.uint8(filtered_depth)
+
+
+            filtered_depth = cv2.applyColorMap(filtered_depth,self.colormap)
+
+
             self.disparity_left = disparity_color_l
-            self.filteredImg = filteredImg
+            self.filtered_depth = filtered_depth
             self.depth = depth
 
 
@@ -173,7 +195,7 @@ class DisparityCalc(threading.Thread):
         return self.disparity_left
 
     def getFilteredImg(self):
-        return self.filteredImg
+        return self.filtered_depth
 
     def getDepthMap(self):
         return self.depth
@@ -193,7 +215,7 @@ class DisparityCalc(threading.Thread):
             average=0
             for u in range (-1,2):
                 for v in range (-1,2):
-                    average += self.filteredImg[y+u,x+v] #using SGBM in area
+                    average += self.filtered_depth[y+u,x+v] #using SGBM in area
             average=average/9
             distance= -593.97*average**(3) + 1506.8*average**(2) - 1373.1*average + 522.06
             #cubic equation from source (experimental)

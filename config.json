@@ -1,1 +1,1 @@
-{"sgbm_mode": 2, "minDisparity": 19, "numDisparities": 125, "blockSize": 7, "windowSize": 43, "focal_length": 0, "color_map": 4, "wls_lambda": 43, "wls_sigma": 15}
+{"sgbm_mode": 2, "min_disp": 103, "num_disp": 129, "block_size": 3, "window_size": 6, "disp12MaxDiff": 147, "uniquenessRatio": 22, "speckleWindowSize": 0, "speckleRange": 10, "preFilterCap": 20, "focus_len": 0, "color_map": 4, "wls_lambda": 1000, "wls_sigma": 3}
