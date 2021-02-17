@@ -92,8 +92,8 @@ class DisparityCalc(threading.Thread):
         self.preFilterCap = settings['preFilterCap']
 
 
-        self.P1 = 8*3*self.windowSize**2
-        self.P2 = 32*3*self.windowSize**2
+        #self.P1 = 8*3*self.windowSize**2
+        #self.P2 = 32*3*self.windowSize**2
 
 
         self.stereoSGBM = cv2.StereoSGBM_create(
@@ -128,7 +128,7 @@ class DisparityCalc(threading.Thread):
             wls_filter.setSigmaColor(self.sigma)
 
             displ = left_matcher.compute(self.left_image, self.right_image)#.astype(np.float32)/16
-            dispr = right_matcher.compute(self.right_image, self.left_image)  # .astype(np.float32)/16
+            dispr = right_matcher.compute(self.right_image, self.left_image)#.astype(np.float32)/16
 
             #displ = np.int16(displ)
             #dispr = np.int16(dispr)
@@ -139,35 +139,26 @@ class DisparityCalc(threading.Thread):
 
             local_max = displ.max()
             local_min = displ.min()
-            disparity_grayscale_l = displ
-            #disparity_grayscale_l = (displ-local_min)*(65535.0/(local_max-local_min))
+            #disparity_grayscale_l = displ
+            disparity_grayscale_l = (displ-local_min)*(65535.0/(local_max-local_min))
             disparity_fixtype_l = cv2.convertScaleAbs(disparity_grayscale_l, alpha=(255.0/65535.0))
             disparity_color_l = cv2.applyColorMap(disparity_fixtype_l, cv2.COLORMAP_JET)
 
             local_max = dispr.max()
             local_min = dispr.min()
-            disparity_grayscale_r = dispr
-            #disparity_grayscale_r = (dispr-local_min)*(65535.0/(local_max-local_min))
+            #disparity_grayscale_r = dispr
+            disparity_grayscale_r = (dispr-local_min)*(65535.0/(local_max-local_min))
             disparity_fixtype_r = cv2.convertScaleAbs(disparity_grayscale_r, alpha=(255.0/65535.0))
             disparity_color_r = cv2.applyColorMap(disparity_fixtype_r, cv2.COLORMAP_JET)
 
-            depth = cv2.reprojectImageTo3D(displ, self.Q)
-            #depth = reshape(depth, [], 3);
 
 
-            #filtered_depth = wls_filter.filter(displ, self.left_image, None, dispr)
-            #conf_map = wls_filter.getConfidenceMap()
-            #ROI = wls_filter.getROI()
-            #filtered_depth = wls_filter.filter(displ, self.left_image, None, dispr, ROI)
+            filtered_depth = wls_filter.filter(disparity_fixtype_l, self.left_image, None, disparity_fixtype_r)
+            filtered_depth = cv2.normalize(src=filtered_depth, dst=filtered_depth, beta=1,
+            alpha=255, norm_type=cv2.NORM_MINMAX);
+            filtered_depth = np.uint8(filtered_depth)
 
-
-
-
-            #OPTIONAL
-            # depth= ((depth.astype(np.float32)/ 16)-self.minDisparity)/self.numDisparities
-            # depth = cv2.morphologyEx(depth,cv2.MORPH_CLOSE, kernel)
-            # depth= (depth-depth.min())*255
-            # depth= depth.astype(np.int16)
+            filtered_depth = cv2.applyColorMap(filtered_depth,self.colormap)
 
             local_max = displ.max()
             local_min = displ.min()
@@ -175,17 +166,12 @@ class DisparityCalc(threading.Thread):
             disparity_fixtype_l = cv2.convertScaleAbs(disparity_grayscale_l, alpha=(255.0/65535.0))
             disparity_color_l = cv2.applyColorMap(disparity_fixtype_l, self.colormap)
 
-            filtered_depth = wls_filter.filter(disparity_fixtype_l, self.left_image, None, disparity_fixtype_r)
-            filtered_depth = cv2.normalize(src=filtered_depth, dst=filtered_depth, beta=1,
-            alpha=255, norm_type=cv2.NORM_MINMAX);
-            filtered_depth = np.uint8(filtered_depth)
-
-
-            filtered_depth = cv2.applyColorMap(filtered_depth,self.colormap)
-
 
             self.disparity_left = disparity_color_l
             self.filtered_depth = filtered_depth
+
+
+            depth = cv2.reprojectImageTo3D(displ, self.Q)
             self.depth = depth
 
 

@@ -55,7 +55,7 @@ def getTrackbarValues():
 
 
 
-    tv['window_size'] = tv['window_size'] #* 1000
+    tv['window_size'] = tv['window_size']
     tv['wls_sigma'] = tv['wls_sigma']/10.
 
 
@@ -63,7 +63,7 @@ def getTrackbarValues():
     tv['block_size'] = int( 2 * round( tv['block_size']/ 2. ))+1 #fool protection
     tv['focus_len'] = int( 5 * round( tv['focus_len'] / 5. )) #fool protection
 
-    tv['min_disp'] = tv['min_disp'] - 100
+    tv['min_disp'] = tv['min_disp']
     if tv['num_disp'] < 16:
         tv['num_disp'] = 16
     tv['num_disp'] = int( 16 * round( tv['num_disp'] / 16. )) #fool protection
@@ -242,8 +242,6 @@ def main(argv=sys.argv):
 
         left_check = frames[0].copy()
         right_check = frames[1].copy()
-
-        img = left_check
 
 
         for line in range(0, int(left_check.shape[0]/20)): # Draw the Lines on the images Then numer of line is defines by the image Size/20
