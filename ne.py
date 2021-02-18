@@ -57,11 +57,11 @@ def getTrackbarValues():
     focus_len = cv2.getTrackbarPos('Focal length', 'Disparity')
     color_map = cv2.getTrackbarPos('Color Map', 'Disparity')
 
-    window_size = cv2.getTrackbarPos('WLS lambda', 'Disparity')
+    wls_lambda= cv2.getTrackbarPos('WLS lambda', 'Disparity')
     wls_sigma= cv2.getTrackbarPos('WLS sigma', 'Disparity')
     wls_vismult = cv2.getTrackbarPos('WLS vismult', 'Disparity')
 
-    new_window_size = window_size * 1000
+    new_wls_lambda= wls_lambda * 1000
     new_wls_sigma = wls_sigma/10.
 
 
@@ -73,7 +73,7 @@ def getTrackbarValues():
         num_disp = 16
     num_disp = int( 16 * round( num_disp / 16. )) #fool protection
 
-    return (sgbm_mode, min_disp, num_disp, block_size, window_size, focus_len, color_map, new_window_size, new_wls_sigma, wls_vismult)
+    return (sgbm_mode, min_disp, num_disp, block_size, window_size, focus_len, color_map, new_wls_lambda, new_wls_sigma, wls_vismult)
 
 def getTrackbarValuesRaw():
     sgbm_mode = cv2.getTrackbarPos('SGBM mode', 'Disparity')
@@ -84,12 +84,12 @@ def getTrackbarValuesRaw():
     focus_len = cv2.getTrackbarPos('Focal length', 'Disparity')
     color_map = cv2.getTrackbarPos('Color Map', 'Disparity')
 
-    window_size = cv2.getTrackbarPos('WLS lambda', 'Disparity')
+    wls_lambda = cv2.getTrackbarPos('WLS lambda', 'Disparity')
     wls_sigma= cv2.getTrackbarPos('WLS sigma', 'Disparity')
 
 
     return (sgbm_mode, min_disp, num_disp, block_size, window_size,
-     focus_len, color_map, window_size, wls_sigma)
+     focus_len, color_map, wls_labmda, wls_sigma)
 
 def trackerCallback(*argv):
     global trackerEvent
