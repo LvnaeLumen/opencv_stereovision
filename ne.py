@@ -61,7 +61,7 @@ def getTrackbarValues():
     wls_sigma= cv2.getTrackbarPos('WLS sigma', 'Disparity')
     wls_vismult = cv2.getTrackbarPos('WLS vismult', 'Disparity')
 
-    new_window_size = window_size * 1000
+    new_window_size = 5#window_size
     new_wls_sigma = wls_sigma/10.
 
 
@@ -214,6 +214,7 @@ def main(argv=sys.argv):
 
 
     global trackerEvent
+    #trackerEvent = True
     #cv2.setMouseCallback("Filtered Color Depth",coords_mouse_disp,disp)
     #frames= cameras.getFrames(flagC_CALIB)
     while True:

@@ -1,0 +1,16 @@
+
+Opencv
+
+v4l2
+Мерцание камеры
+└─ $ ▶ v4l2-ctl -d /dev/video --set-ctrl=power_line_frequency=1
+Cannot open device /dev/video, exiting.
+ivan [548] ivan:/home/ivan/vc
+└─ $ ▶ v4l2-ctl -d /dev/video0 --set-ctrl=power_line_frequency=1
+ivan [549] ivan:/home/ivan/vc
+└─ $ ▶ v4l2-ctl -d /dev/video2 --set-ctrl=power_line_frequency=1
+
+
+https://stackoverflow.com/questions/58113312/calculate-depth-disparity-map-using-opencv
+
+

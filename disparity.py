@@ -66,8 +66,6 @@ class DisparityCalc(threading.Thread):
 
         self.Q = Q
 
-
-
         self.stop_event= threading.Event()
         thread = threading.Thread(target=self.run, args=())
         #thread.daemon = True                            # Daemonize thread
@@ -85,6 +83,8 @@ class DisparityCalc(threading.Thread):
         self.lmbda = lmbda
         self.sigma = sigma
 
+        #self.P1 = 8*3*self.windowSize**2
+        #self.P2 = 32*3*self.windowSize**2
 
         self.stereoSGBM = cv2.StereoSGBM_create(
         minDisparity = self.minDisparity,
@@ -96,6 +96,7 @@ class DisparityCalc(threading.Thread):
         uniquenessRatio = self.uniquenessRatio,
         speckleWindowSize = self.speckleWindowSize,
         speckleRange = self.speckleRange,
+        preFilterCap = self.preFilterCap,
         mode = self.mode
         )
     def update_image(self, gray_frames):
@@ -130,14 +131,14 @@ class DisparityCalc(threading.Thread):
             #disparity_grayscale_l = displ
             disparity_grayscale_l = (displ-local_min)*(65535.0/(local_max-local_min))
             disparity_fixtype_l = cv2.convertScaleAbs(disparity_grayscale_l, alpha=(255.0/65535.0))
-            disparity_color_l = cv2.applyColorMap(disparity_fixtype_l, cv2.COLORMAP_JET)
+            disparity_color_l = cv2.applyColorMap(disparity_fixtype_l, self.colormap)
 
             local_max = dispr.max()
             local_min = dispr.min()
             #disparity_grayscale_r = dispr
             disparity_grayscale_r = (dispr-local_min)*(65535.0/(local_max-local_min))
             disparity_fixtype_r = cv2.convertScaleAbs(disparity_grayscale_r, alpha=(255.0/65535.0))
-            disparity_color_r = cv2.applyColorMap(disparity_fixtype_r, cv2.COLORMAP_JET)
+            disparity_color_r = cv2.applyColorMap(disparity_fixtype_r, self.colormap)
 
             depth = cv2.reprojectImageTo3D(displ, self.Q)
             #depth = reshape(depth, [], 3);
