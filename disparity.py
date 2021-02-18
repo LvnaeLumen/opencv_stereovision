@@ -1,6 +1,7 @@
 import cv2
 import threading
 import numpy as np
+import camera
 
 
 lmbda = 80000
@@ -9,7 +10,7 @@ sigma = 1.8
 kernel= np.ones((3,3),np.uint8)
 
 class DisparityCalc(threading.Thread):
-    def __init__(self, gray_frames, Q):
+    def __init__(self, color_frames, gray_frames, Q):
         """ Constructor
         :type interval: int
         :param interval: Check interval, in seconds
@@ -32,6 +33,9 @@ class DisparityCalc(threading.Thread):
         self.speckleRange  = 32
         self.colormap = 4
         self.Q = Q
+
+        self.left_color = color_frames[0]
+        self.right_color = color_frames[1]
 
         self.left_image = gray_frames[0]
         self.right_image = gray_frames[1]
@@ -98,9 +102,72 @@ class DisparityCalc(threading.Thread):
         speckleRange = self.speckleRange,
         mode = self.mode
         )
-    def update_image(self, gray_frames):
+    def update_image(self, color_frames, gray_frames):
+
+
+        self.left_color = color_frames[0]
+        self.right_color = color_frames[1]
+
         self.left_image = gray_frames[0]
         self.right_image = gray_frames[1]
+
+    def getCalibData(self):
+
+        ret = dict()
+
+
+        fs = cv2.FileStorage("extrinsics.yml", cv2.FILE_STORAGE_READ)
+        fn = fs.getNode("R")
+        R = fn.mat()
+
+        ret['R'] = R
+
+        fn = fs.getNode("T")
+        T = fn.mat()
+        ret['T'] = T
+
+        fn = fs.getNode("R1")
+        R1 = fn.mat()
+        ret['R1'] = R1
+
+        fn = fs.getNode("R2")
+        R2 = fn.mat()
+        ret['R2'] = R2
+
+        fn = fs.getNode("P1")
+        P1 = fn.mat()
+        ret['P1'] = P1
+
+        fn = fs.getNode("P2")
+        P2 = fn.mat()
+        ret['P2'] = P2
+
+        fn = fs.getNode("Q")
+        Q = fn.mat()
+        ret['Q'] = Q
+
+        fs.release()
+
+        fs = cv2.FileStorage("intrinsics.yml", cv2.FILE_STORAGE_READ)
+
+        fn = fs.getNode("M1")
+        M1 = fn.mat()
+        ret['M1'] = M1
+
+        fn = fs.getNode("D1")
+        D1 = fn.mat()
+        ret['D1'] = D1
+
+        fn = fs.getNode("M2")
+        M2 = fn.mat()
+        ret['M2'] = M2
+
+        fn = fs.getNode("D2")
+        D2 = fn.mat()
+        ret['D2'] = D2
+
+        fs.release()
+        return ret
 
 
 
@@ -161,6 +228,22 @@ class DisparityCalc(threading.Thread):
             # depth = cv2.morphologyEx(depth,cv2.MORPH_CLOSE, kernel)
             # depth= (depth-depth.min())*255
             # depth= depth.astype(np.int16)
+
+            #cam1 = calib_matrix_P2[:,:3] # left color image
+            #cam2 = calib_matrix_P3[:,:3] # right color imagerev_proj_matrix = np.zeros((4,4)) # to store the outputcv2.stereoRectify(cameraMatrix1 = cam1,cameraMatrix2 = cam2,
+
+            rev_proj_matrix = np.zeros((4,4)) # to store the output
+
+            calib_data = self.getCalibData()
+
+            cv2.stereoRectify(cameraMatrix1 = self.left_color,
+                    cameraMatrix2 = self.right_color,
+                  distCoeffs1 = 0, distCoeffs2 = 0,
+                  imageSize = disparity_color_l.shape[:2],
+                  R = calib_data['R'], T = calib_data['T'],
+                  R1 = calib_data['R1'], R2 = calib_data['R2'],
+                  P1 =  calib_data['P1'], P2 =  calib_data['P2'],
+                  Q = calib_data['Q'])
 
             self.disparity_left = disparity_color_l
             self.filteredImg = filteredImg

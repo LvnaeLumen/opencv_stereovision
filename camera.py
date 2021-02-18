@@ -116,6 +116,9 @@ def CalibInfo(colored, gray):
     cv2.imshow('Left',  buff_left)
     cv2.imshow('Right', buff_right)
 
+
+
+
 def CalibrateFromFile(HEIGHT, WIDTH):
     fs = cv2.FileStorage("extrinsics.yml", cv2.FILE_STORAGE_READ)
     fn = fs.getNode("R")

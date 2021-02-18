@@ -199,8 +199,8 @@ def main(argv=sys.argv):
     grays = getGrays(frames)
 
     #Initiate disparity threading
-    depth_map = DisparityCalc(grays, Q)
-    depth_map.update_image(grays)
+    depth_map = DisparityCalc(frames, grays, Q)
+    depth_map.update_image(frames, grays)
     disp = depth_map.getDisparity()
 
 
@@ -231,7 +231,7 @@ def main(argv=sys.argv):
 
         frames_lines =  np.hstack([left_check, right_check])
 
-        depth_map.update_image(grays)
+        depth_map.update_image(frames, grays)
         disp = depth_map.getDisparity()
         fim = depth_map.getFilteredImg()
         depth = depth_map.getDepthMap()
