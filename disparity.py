@@ -83,14 +83,14 @@ class DisparityCalc(threading.Thread):
         self.lmbda = settings['wls_lambda']
         self.sigma = settings['wls_sigma']
 
-        self.disp12MaxDiff = settings['disp12MaxDiff']
-        self.uniquenessRatio = settings['uniquenessRatio']
-        self.speckleWindowSize  = settings['speckleWindowSize']
-        self.speckleRange = settings['speckleRange']
-        self.preFilterCap = settings['preFilterCap']
+        # self.disp12MaxDiff = settings['disp12MaxDiff']
+        # self.uniquenessRatio = settings['uniquenessRatio']
+        # self.speckleWindowSize  = settings['speckleWindowSize']
+        # self.speckleRange = settings['speckleRange']
+        # self.preFilterCap = settings['preFilterCap']
 
-        self.P1 = 8*3*self.windowSize**2
-        self.P2 = 32*3*self.windowSize**2
+        #self.P1 = 8*3*self.windowSize**2
+        #self.P2 = 32*3*self.windowSize**2
 
         self.stereoSGBM = cv2.StereoSGBM_create(
         minDisparity = self.minDisparity,
