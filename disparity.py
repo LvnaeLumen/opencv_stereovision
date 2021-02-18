@@ -38,6 +38,7 @@ class DisparityCalc(threading.Thread):
 
         self.lmbda = 80000
         self.sigma = 1.8
+        self.mode = 2
 
 
 
@@ -52,7 +53,7 @@ class DisparityCalc(threading.Thread):
         speckleWindowSize = self.speckleWindowSize,
         speckleRange = self.speckleRange,
         preFilterCap = self.preFilterCap,
-        mode = cv2.STEREO_SGBM_MODE_SGBM_3WAY
+        mode = self.mode#cv2.STEREO_SGBM_MODE_SGBM_3WAY
         )
 
         self.filteredImg = np.zeros((640, 480, 3), np.int16)
@@ -71,20 +72,25 @@ class DisparityCalc(threading.Thread):
         #thread.daemon = True                            # Daemonize thread
         thread.start()                                  # Start the execution
 
-    def update_settings(self, mode, minDisparity, numDisparities,
-            blockSize, windowSize, focus_len, color_map, lmbda, sigma):
-        self.minDisparity = minDisparity
-        self.numDisparities = numDisparities
-        self.blockSize = blockSize
-        self.windowSize = windowSize
-        self.mode = mode
-        self.colormap = color_map
+    def update_settings(self, settings):
+        self.minDisparity = settings['min_disp']
+        self.numDisparities = settings['num_disp']
+        self.blockSize = settings['block_size']
+        self.windowSize = settings['window_size']
+        self.mode = settings['sgbm_mode']
+        self.colormap = settings['color_map']
 
-        self.lmbda = lmbda
-        self.sigma = sigma
+        self.lmbda = settings['wls_lambda']
+        self.sigma = settings['wls_sigma']
 
-        #self.P1 = 8*3*self.windowSize**2
-        #self.P2 = 32*3*self.windowSize**2
+        self.disp12MaxDiff = settings['disp12MaxDiff']
+        self.uniquenessRatio = settings['uniquenessRatio']
+        self.speckleWindowSize  = settings['speckleWindowSize']
+        self.speckleRange = settings['speckleRange']
+        self.preFilterCap = settings['preFilterCap']
+
+        self.P1 = 8*3*self.windowSize**2
+        self.P2 = 32*3*self.windowSize**2
 
         self.stereoSGBM = cv2.StereoSGBM_create(
         minDisparity = self.minDisparity,
@@ -102,6 +108,8 @@ class DisparityCalc(threading.Thread):
     def update_image(self, gray_frames):
         self.left_image = gray_frames[0]
         self.right_image = gray_frames[1]
+
+
 
 
 

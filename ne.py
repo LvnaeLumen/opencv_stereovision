@@ -49,52 +49,58 @@ def resetTrackabarValues():
     return (0,2,128,5,5,0,4,4)
 
 def getTrackbarValues():
-    sgbm_mode = cv2.getTrackbarPos('SGBM mode', 'Disparity')
-    min_disp = cv2.getTrackbarPos('minDisparity', 'Disparity')
-    num_disp = cv2.getTrackbarPos('numDisparities', 'Disparity')
-    block_size = cv2.getTrackbarPos('blockSize', 'Disparity')
-    window_size = cv2.getTrackbarPos('windowSize', 'Disparity')
-    focus_len = cv2.getTrackbarPos('Focal length', 'Disparity')
-    color_map = cv2.getTrackbarPos('Color Map', 'Disparity')
 
-    window_size = cv2.getTrackbarPos('WLS lambda', 'Disparity')
-    wls_sigma= cv2.getTrackbarPos('WLS sigma', 'Disparity')
-    wls_vismult = cv2.getTrackbarPos('WLS vismult', 'Disparity')
+    tv = getTrackbarValuesRaw()
 
-    new_window_size = 5#window_size
-    new_wls_sigma = wls_sigma/10.
+    tv['window_size'] = tv['window_size']
+    tv['wls_sigma'] = tv['wls_sigma']/10.
+    tv['wls_lambda'] = tv['wls_lambda'] *1000
 
 
 
-    block_size = int( 2 * round( block_size/ 2. ))+1 #fool protection
-    focus_len = int( 5 * round( focus_len / 5. )) #fool protection
+    tv['block_size'] = int( 2 * round( tv['block_size']/ 2. ))+1 #fool protection
+    tv['focus_len'] = int( 5 * round( tv['focus_len'] / 5. )) #fool protection
 
-    if num_disp < 16:
-        num_disp = 16
-    num_disp = int( 16 * round( num_disp / 16. )) #fool protection
+    tv['min_disp'] = tv['min_disp']
+    if tv['num_disp'] < 16:
+        tv['num_disp'] = 16
+    tv['num_disp'] = int( 16 * round( tv['num_disp'] / 16. )) #fool protection
 
-    return (sgbm_mode, min_disp, num_disp, block_size, window_size, focus_len, color_map, new_window_size, new_wls_sigma, wls_vismult)
+    return tv
 
 def getTrackbarValuesRaw():
-    sgbm_mode = cv2.getTrackbarPos('SGBM mode', 'Disparity')
-    min_disp = cv2.getTrackbarPos('minDisparity', 'Disparity')
-    num_disp = cv2.getTrackbarPos('numDisparities', 'Disparity')
-    block_size = cv2.getTrackbarPos('blockSize', 'Disparity')
-    window_size = cv2.getTrackbarPos('windowSize', 'Disparity')
-    focus_len = cv2.getTrackbarPos('Focal length', 'Disparity')
-    color_map = cv2.getTrackbarPos('Color Map', 'Disparity')
+    tv = {}
+    tv['sgbm_mode'] = cv2.getTrackbarPos('SGBM mode', 'Disparity')
+    tv['min_disp'] = cv2.getTrackbarPos('minDisparity', 'Disparity')
+    tv['num_disp'] = cv2.getTrackbarPos('numDisparities', 'Disparity')
+    tv['block_size'] = cv2.getTrackbarPos('blockSize', 'Disparity')
+    tv['window_size'] = cv2.getTrackbarPos('windowSize', 'Disparity')
 
-    window_size = cv2.getTrackbarPos('WLS lambda', 'Disparity')
-    wls_sigma= cv2.getTrackbarPos('WLS sigma', 'Disparity')
+    tv['disp12MaxDiff'] = cv2.getTrackbarPos('disp12MaxDiff', 'Disparity')
+    tv['uniquenessRatio'] = cv2.getTrackbarPos('uniquenessRatio', 'Disparity')
+    tv['speckleWindowSize'] = cv2.getTrackbarPos('speckleWindowSize', 'Disparity')
+    tv['speckleRange'] = cv2.getTrackbarPos('speckleRange', 'Disparity')
+    tv['preFilterCap'] = cv2.getTrackbarPos('preFilterCap', 'Disparity')
 
+    tv['focus_len'] = cv2.getTrackbarPos('Focus length', 'Disparity')
+    tv['color_map'] = cv2.getTrackbarPos('Color Map', 'Disparity')
 
-    return (sgbm_mode, min_disp, num_disp, block_size, window_size,
-     focus_len, color_map, window_size, wls_sigma)
+    tv['wls_lambda'] = cv2.getTrackbarPos('WLS lambda', 'Disparity')
+    tv['wls_sigma']= cv2.getTrackbarPos('WLS sigma', 'Disparity')
+
+    return tv
 
 def trackerCallback(*argv):
     global trackerEvent
     trackerEvent = True
 
+def contrast_adj(img):
+
+    alpha=1.5
+    beta=20
+
+    img_o=cv2.addWeighted(img,alpha,np.zeros(img.shape, img.dtype),0,beta)
+    return img_o
 
 def redrawCams():
 
@@ -150,14 +156,19 @@ def main(argv=sys.argv):
 
     cv2.namedWindow('Disparity')
     cv2.createTrackbar('SGBM mode', 'Disparity', config_dict['sgbm_mode'], 3, trackerCallback)
-    cv2.createTrackbar('minDisparity', 'Disparity', config_dict['minDisparity'], 128, trackerCallback)
-    cv2.createTrackbar('numDisparities', 'Disparity', config_dict['numDisparities'], 400, trackerCallback)
-    cv2.createTrackbar('blockSize', 'Disparity', config_dict['blockSize'], 135, trackerCallback)
-    cv2.createTrackbar('windowSize', 'Disparity', config_dict['windowSize'], 20, trackerCallback)
-    cv2.createTrackbar('Focal length', 'Disparity',  config_dict['focal_length'], 255, trackerCallback)
+    cv2.createTrackbar('minDisparity', 'Disparity', config_dict['min_disp'], 256, trackerCallback)
+    cv2.createTrackbar('numDisparities', 'Disparity', config_dict['num_disp'], 400, trackerCallback)
+    cv2.createTrackbar('blockSize', 'Disparity', config_dict['block_size'], 135, trackerCallback)
+    cv2.createTrackbar('windowSize', 'Disparity', config_dict['window_size'], 20, trackerCallback)
+    cv2.createTrackbar('disp12MaxDiff', 'Disparity', config_dict['disp12MaxDiff'], 255, trackerCallback)
+    cv2.createTrackbar('uniquenessRatio', 'Disparity', config_dict['uniquenessRatio'], 255, trackerCallback)
+    cv2.createTrackbar('speckleWindowSize', 'Disparity', config_dict['speckleWindowSize'], 255, trackerCallback)
+    cv2.createTrackbar('speckleRange', 'Disparity',  config_dict['speckleRange'], 10, trackerCallback)
+    cv2.createTrackbar('preFilterCap', 'Disparity', config_dict['preFilterCap'], 255, trackerCallback)
     cv2.createTrackbar('Color Map', 'Disparity',  config_dict['color_map'] , 21, trackerCallback)
     cv2.createTrackbar('WLS lambda', 'Disparity',  config_dict['wls_lambda'] , 1000, trackerCallback)
     cv2.createTrackbar('WLS sigma', 'Disparity',  config_dict['wls_sigma'] , 20, trackerCallback)
+    cv2.createTrackbar('Focus length', 'Disparity',  config_dict['focus_len'] , 255, trackerCallback)
 
 
     trackbar_values = getTrackbarValues()
@@ -175,6 +186,8 @@ def main(argv=sys.argv):
     flagW_DISPARITY = False
     flagS_LINES = False
     flagC_CALIB = True
+    flagZ_CONTRAST = True
+    flagX_DEPTH = False
 
     obj_rects = []
     obj_centers = []
@@ -214,13 +227,17 @@ def main(argv=sys.argv):
 
 
     global trackerEvent
-    #trackerEvent = True
+    trackerEvent = True
     #cv2.setMouseCallback("Filtered Color Depth",coords_mouse_disp,disp)
     #frames= cameras.getFrames(flagC_CALIB)
     while True:
 
 
         frames= cameras.getFrames(flagC_CALIB)
+        if (flagZ_CONTRAST):
+            frames[0] = contrast_adj(frames[0])
+            frames[1] = contrast_adj(frames[1])
+
         grays = getGrays(frames)
 
         left_check = frames[0].copy()
@@ -252,8 +269,8 @@ def main(argv=sys.argv):
 
         if(trackerEvent):
             tv = getTrackbarValues()
-            depth_map.update_settings(tv[0], tv[1], tv[2], tv[3], tv[4], tv[5], tv[6], tv[7], tv[8])
-            cameras.updateFocus(tv[5])
+            depth_map.update_settings(tv)
+            cameras.updateFocus(tv)
 
 
             trackerEvent = False
@@ -274,6 +291,8 @@ def main(argv=sys.argv):
             flagS_LINES = not flagS_LINES
         if ch == ord('c'): #use calibration
             flagC_CALIB = not flagC_CALIB
+        if ch == ord('x'): #use calibration
+            flagX_DEPTH = not flagX_DEPTH
         if ch == ord('t'): #reset trackbar
             print("Reset trackbar cameras")
             #tr = resetTrackabarValuesRaw()
@@ -284,6 +303,8 @@ def main(argv=sys.argv):
             cv2.setTrackbarPos('windowSize', 'Disparity', 5)
             cv2.setTrackbarPos('Focal length', 'Disparity',  0)
             cv2.setTrackbarPos('Color Map', 'Disparity', 4)
+        if ch == ord('z'):
+            flagZ_CONTRAST = not flagZ_CONTRAST
         if ch == ord('r'): #swap cameras
             print("Swap cameras")
             cameras.swapCameras()
@@ -308,19 +329,9 @@ def main(argv=sys.argv):
 
 
     tv = getTrackbarValuesRaw()
-    conf =    {
-        'sgbm_mode': tv[0],
-        'minDisparity':tv[1],
-        'numDisparities':tv[2],
-        'blockSize':tv[3],
-        'windowSize':tv[4],
-        'focal_length':tv[5],
-        'color_map':tv[6],
-        'wls_lambda':tv[7],
-        'wls_sigma':tv[8]
-    }
+
     with open(r'config.json', 'w') as f:
-        json.dump(conf, f)
+        json.dump(tv, f)
 
     cv2.destroyAllWindows()
     sys.exit()

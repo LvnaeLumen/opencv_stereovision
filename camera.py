@@ -54,9 +54,9 @@ class CameraAsyncReading(threading.Thread):
 
 
 
-    def updateFocus(self, focus):
-        self.video_capture_0.set(28, focus )
-        self.video_capture_1.set(28, focus )
+    def updateFocus(self, tv):
+        self.video_capture_0.set(28, tv['focus_len'] )
+        self.video_capture_1.set(28, tv['focus_len'] )
 
     def getFrames(self, calibrate = True):
         if(calibrate):
