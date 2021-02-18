@@ -1,1 +1,1 @@
-{"sgbm_mode": 2, "min_disp": 2, "num_disp": 138, "block_size": 5, "window_size": 5, "disp12MaxDiff": 35, "uniquenessRatio": 226, "speckleWindowSize": 76, "speckleRange": 1, "preFilterCap": 160, "focus_len": 18, "color_map": 4, "wls_lambda": 637, "wls_sigma": 18}
+{"sgbm_mode": 2, "min_disp": 7, "num_disp": 116, "block_size": 5, "window_size": 6, "disp12MaxDiff": 35, "uniquenessRatio": 226, "speckleWindowSize": 76, "speckleRange": 1, "preFilterCap": 160, "focus_len": 18, "color_map": 4, "wls_lambda": 637, "wls_sigma": 18}

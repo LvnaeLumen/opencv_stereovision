@@ -89,8 +89,8 @@ class DisparityCalc(threading.Thread):
         # self.speckleRange = settings['speckleRange']
         # self.preFilterCap = settings['preFilterCap']
 
-        #self.P1 = 8*3*self.windowSize**2
-        #self.P2 = 32*3*self.windowSize**2
+        self.P1 = 8*3*self.windowSize**2
+        self.P2 = 32*3*self.windowSize**2
 
         self.stereoSGBM = cv2.StereoSGBM_create(
         minDisparity = self.minDisparity,
