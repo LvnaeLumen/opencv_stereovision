@@ -236,14 +236,14 @@ class DisparityCalc(threading.Thread):
 
             calib_data = self.getCalibData()
 
-            cv2.stereoRectify(cameraMatrix1 = self.left_color,
-                    cameraMatrix2 = self.right_color,
-                  distCoeffs1 = 0, distCoeffs2 = 0,
-                  imageSize = disparity_color_l.shape[:2],
-                  R = calib_data['R'], T = calib_data['T'],
-                  R1 = calib_data['R1'], R2 = calib_data['R2'],
-                  P1 =  calib_data['P1'], P2 =  calib_data['P2'],
-                  Q = calib_data['Q'])
+            # cv2.stereoRectify(cameraMatrix1 = self.left_color,
+            #         cameraMatrix2 = self.right_color,
+            #       distCoeffs1 = 0, distCoeffs2 = 0,
+            #       imageSize = disparity_color_l.shape[:2],
+            #       R = calib_data['R'], T = calib_data['T'],
+            #       R1 = calib_data['R1'], R2 = calib_data['R2'],
+            #       P1 =  calib_data['P1'], P2 =  calib_data['P2'],
+            #       Q = calib_data['Q'])
 
             self.disparity_left = disparity_color_l
             self.filteredImg = filteredImg
