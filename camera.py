@@ -4,7 +4,7 @@ import yaml
 
 
 class CameraAsyncReading(threading.Thread):
-    def __init__(self, cams, height = 640, width = 480):
+    def __init__(self, cams, height = 480, width = 320):
         """ Constructor
         :type interval: int
         :param interval: Check interval, in seconds
