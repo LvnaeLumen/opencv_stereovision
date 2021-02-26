@@ -89,7 +89,7 @@ def getTrackbarValuesRaw():
 
 
     return (sgbm_mode, min_disp, num_disp, block_size, window_size,
-     focus_len, color_map, wls_labmda, wls_sigma)
+     focus_len, color_map, wls_lambda, wls_sigma)
 
 def trackerCallback(*argv):
     global trackerEvent
@@ -175,6 +175,7 @@ def main(argv=sys.argv):
     flagW_DISPARITY = False
     flagS_LINES = False
     flagC_CALIB = True
+    flagN_POINT = False
 
     obj_rects = []
     obj_centers = []
@@ -203,17 +204,20 @@ def main(argv=sys.argv):
     depth_map.update_image(frames, grays)
     disp = depth_map.getDisparity()
 
+    #pointcloud = depth_map.getPointCloud()
+
 
 
 
     cv2.setMouseCallback("Disparity",depth_map.coords_mouse_disp,disp)
-    names = ['Left Image', 'Right Image', 'Left Gray Image', 'Right Gray Image', 'Disp', 'Lines', 'Disparity']
+    names = ['Left Image', 'Right Image', 'Left Gray Image', 'Right Gray Image', 'Lines', 'Disp', 'Pointcloud']
 
     i = 0
 
 
 
     global trackerEvent
+    trackerEvent = True
     #cv2.setMouseCallback("Filtered Color Depth",coords_mouse_disp,disp)
     #frames= cameras.getFrames(flagC_CALIB)
     while True:
@@ -234,10 +238,10 @@ def main(argv=sys.argv):
         depth_map.update_image(frames, grays)
         disp = depth_map.getDisparity()
         fim = depth_map.getFilteredImg()
-        depth = depth_map.getDepthMap()
+        #depth = depth_map.getDepthMap()
 
         show_frames = frames[0], frames[1], grays[0], grays[1], frames_lines, disp
-        flags = [flagQ_LEFTSOURCE, flagE_RIGHTSOURCE, flagA_LEFTGRAY, flagD_RIGHTGRAY, flagS_LINES, flagW_DISPARITY]
+        flags = [flagQ_LEFTSOURCE, flagE_RIGHTSOURCE, flagA_LEFTGRAY, flagD_RIGHTGRAY, flagS_LINES, flagW_DISPARITY, flagN_POINT]
 
 
         #disps=  np.hstack([disp, fim])
@@ -273,6 +277,8 @@ def main(argv=sys.argv):
             flagS_LINES = not flagS_LINES
         if ch == ord('c'): #use calibration
             flagC_CALIB = not flagC_CALIB
+        if ch == ord('n'): #use calibration
+            depth_map.calculatePointCloud()
         if ch == ord('t'): #reset trackbar
             print("Reset trackbar cameras")
             #tr = resetTrackabarValuesRaw()

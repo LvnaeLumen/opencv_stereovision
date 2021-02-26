@@ -60,8 +60,8 @@ class CameraAsyncReading(threading.Thread):
 
     def getFrames(self, calibrate = True):
         if(calibrate):
-            frame_left = cv2.remap(self.frame0, self.leftMapX, self.leftMapY, cv2.INTER_LANCZOS4, cv2.BORDER_CONSTANT, 0)
-            frame_right = cv2.remap(self.frame1, self.rightMapX, self.rightMapY, cv2.INTER_LANCZOS4, cv2.BORDER_CONSTANT, 0)
+            frame_left = cv2.remap(self.frame0, self.leftMapX, self.leftMapY, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT, 0)
+            frame_right = cv2.remap(self.frame1, self.rightMapX, self.rightMapY, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT, 0)
         else:
             frame_left = self.frame0
             frame_right = self.frame1

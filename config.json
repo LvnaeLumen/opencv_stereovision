@@ -1,1 +1,1 @@
-{"sgbm_mode": 2, "minDisparity": 19, "numDisparities": 125, "blockSize": 7, "windowSize": 43, "focal_length": 0, "color_map": 4, "wls_lambda": 43, "wls_sigma": 15}
+{"sgbm_mode": 2, "minDisparity": 5, "numDisparities": 114, "blockSize": 7, "windowSize": 19, "focal_length": 15, "color_map": 4, "wls_lambda": 56, "wls_sigma": 13}

@@ -2,6 +2,7 @@ import cv2
 import threading
 import numpy as np
 import camera
+from pointcloud import PointCloud
 
 
 lmbda = 80000
@@ -60,8 +61,10 @@ class DisparityCalc(threading.Thread):
         )
 
         self.filteredImg = np.zeros((640, 480, 3), np.int16)
-        self.disparity_left  = np.zeros((640, 480, 3), np.int16)
+        self.disparity = np.zeros((640, 480, 3), np.int16)
+        self.disparity_gray = np.zeros((640, 480, 3), np.int16)
         self.depth = np.zeros((640, 480, 3), np.int16)
+        #self.disparity_left_g = np.zeros((640, 480, 3), np.int16)
 
         fs = cv2.FileStorage("extrinsics.yml", cv2.FILE_STORAGE_READ)
         fn = fs.getNode("Q")
@@ -185,11 +188,11 @@ class DisparityCalc(threading.Thread):
             displ = left_matcher.compute(self.left_image, self.right_image)#.astype(np.float32)/16
             dispr = right_matcher.compute(self.right_image, self.left_image)  # .astype(np.float32)/16
 
-            displ = np.int16(displ)
-            dispr = np.int16(dispr)
+            displ = np.float32(displ)
+            dispr = np.float32(dispr)
 
-            #displ= ((displ.astype(np.float32)/ 16)-self.minDisparity)/self.numDisparities # Calculation allowing us to have 0 for the most distant object able to detect
-            #dispr= ((dispr.astype(np.float32)/ 16)-self.minDisparity)/self.numDisparities # Calculation allowing us to have 0 for the most distant object able to detect
+            #displ= ((displ.astype(np.float32)/16)-self.minDisparity)/self.numDisparities # Calculation allowing us to have 0 for the most distant object able to detect
+            #dispr= ((dispr.astype(np.float32)/16)-self.minDisparity)/self.numDisparities # Calculation allowing us to have 0 for the most distant object able to detect
 
 
             local_max = displ.max()
@@ -197,27 +200,21 @@ class DisparityCalc(threading.Thread):
             #disparity_grayscale_l = displ
             disparity_grayscale_l = (displ-local_min)*(65535.0/(local_max-local_min))
             disparity_fixtype_l = cv2.convertScaleAbs(disparity_grayscale_l, alpha=(255.0/65535.0))
-            disparity_color_l = cv2.applyColorMap(disparity_fixtype_l, cv2.COLORMAP_JET)
+            disparity_color_l = cv2.applyColorMap(disparity_fixtype_l, self.colormap)
 
             local_max = dispr.max()
             local_min = dispr.min()
             #disparity_grayscale_r = dispr
             disparity_grayscale_r = (dispr-local_min)*(65535.0/(local_max-local_min))
             disparity_fixtype_r = cv2.convertScaleAbs(disparity_grayscale_r, alpha=(255.0/65535.0))
-            disparity_color_r = cv2.applyColorMap(disparity_fixtype_r, cv2.COLORMAP_JET)
+            disparity_color_r = cv2.applyColorMap(disparity_fixtype_r, self.colormap)
 
-            depth = cv2.reprojectImageTo3D(displ, self.Q)
-            #depth = reshape(depth, [], 3);
+
 
             filteredImg = wls_filter.filter(disparity_fixtype_l, self.left_image, None, disparity_fixtype_r)
             filteredImg = wls_filter.filter(displ, self.left_image, None, dispr)
-            #conf_map = wls_filter.getConfidenceMap()
-            #ROI = wls_filter.getROI()
-            #filteredImg = wls_filter.filter(displ, self.left_image, None, dispr, ROI)
-
-
-            filteredImg = cv2.normalize(src=filteredImg, dst=filteredImg, beta=1,
-            alpha=255, norm_type=cv2.NORM_MINMAX);
+            filteredImg = cv2.normalize(src=filteredImg, dst=filteredImg, beta=0,
+            alpha=256, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F);
             filteredImg = np.uint8(filteredImg)
 
             filteredImg = cv2.applyColorMap(filteredImg,self.colormap)
@@ -232,34 +229,63 @@ class DisparityCalc(threading.Thread):
             #cam1 = calib_matrix_P2[:,:3] # left color image
             #cam2 = calib_matrix_P3[:,:3] # right color imagerev_proj_matrix = np.zeros((4,4)) # to store the outputcv2.stereoRectify(cameraMatrix1 = cam1,cameraMatrix2 = cam2,
 
-            rev_proj_matrix = np.zeros((4,4)) # to store the output
+            #depth = reshape(depth, [], 3);
 
-            calib_data = self.getCalibData()
 
-            cv2.stereoRectify(cameraMatrix1 = self.left_color,
-                    cameraMatrix2 = self.right_color,
-                  distCoeffs1 = 0, distCoeffs2 = 0,
-                  imageSize = disparity_color_l.shape[:2],
-                  R = calib_data['R'], T = calib_data['T'],
-                  R1 = calib_data['R1'], R2 = calib_data['R2'],
-                  P1 =  calib_data['P1'], P2 =  calib_data['P2'],
-                  Q = calib_data['Q'])
+            # cv2.stereoRectify(cameraMatrix1 = self.left_color,
+            #         cameraMatrix2 = self.right_color,
+            #       distCoeffs1 = 0, distCoeffs2 = 0,
+            #       imageSize = disparity_color_l.shape[:2],
+            #       R = calib_data['R'], T = calib_data['T'],
+            #       R1 = calib_data['R1'], R2 = calib_data['R2'],
+            #       P1 =  calib_data['P1'], P2 =  calib_data['P2'],
+            #       Q = calib_data['Q'])
 
-            self.disparity_left = disparity_color_l
+
+
+            self.disparity = disparity_color_l
+            self.disparity_gray = disparity_fixtype_l
+
+
             self.filteredImg = filteredImg
-            self.depth = depth
+
 
 
 
 
     def getDisparity(self):
-        return self.disparity_left
+        return self.disparity
 
     def getFilteredImg(self):
         return self.filteredImg
 
     def getDepthMap(self):
         return self.depth
+
+
+
+
+    def calculatePointCloud(self):
+        rev_proj_matrix = np.zeros((4,4)) # to store the output
+
+        calib_data = self.getCalibData()
+
+        points = cv2.reprojectImageTo3D(self.disparity_gray, calib_data['Q'])
+        colors = self.left_color
+        mask_map = self.disparity_gray > self.disparity_gray.min()
+
+        output_points = points[mask_map]
+        output_colors = colors[mask_map]
+
+        pc = PointCloud(output_points, output_colors)
+        pc.filter_infinity()
+
+        pc.write_ply('pointcloud.ply')
+
+
+
+
+
 
 
 
