@@ -184,8 +184,8 @@ class DisparityCalc(threading.Thread):
         wls_filter.setSigmaColor(self.sigma)
 
         filteredImg = wls_filter.filter(disparity_left, self.left_image, None, disparity_right)
-        filteredImg = cv2.normalize(src=filteredImg, dst=filteredImg, beta=0,
-        alpha=256, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F);
+        filteredImg = cv2.normalize(src=filteredImg, dst=filteredImg, beta=1,
+        alpha=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F);
         filteredImg = np.uint8(filteredImg)
 
         filteredImg = cv2.applyColorMap(filteredImg,self.colormap)
@@ -249,7 +249,7 @@ class DisparityCalc(threading.Thread):
         #disparity_fixtype_r= disparity_fixtype_r.astype(np.uint8)
         #disparity_color_r = cv2.applyColorMap(disparity_fixtype_r, self.colormap)
 
-        return disparity_color_l, disparity_fixtype_l, disparity_fixtype_r, displ, dispr
+        return disparity_color_l, disparity_fixtype_l, disparity_fixtype_r, displ, dispr#disparity_grayscale_l, disparity_grayscale_r
 
 
     def run(self):
@@ -258,8 +258,20 @@ class DisparityCalc(threading.Thread):
 
             disparity_color_l, disparity_fixtype_l, disparity_fixtype_r, disparity_grayscale_l, disparity_grayscale_r = self.stereo_depth_map_stereo()
 
+            left_matcher = self.stereoSGBM
+            wls_filter = cv2.ximgproc.createDisparityWLSFilter(matcher_left=left_matcher)
+            wls_filter.setLambda(self.lmbda)
+            wls_filter.setSigmaColor(self.sigma)
 
-            self.filteredImg = self.wlsfilter(disparity_fixtype_l, disparity_fixtype_r)#disparity_color_l#disparity#disparity#disparity_color
+            filteredImg = wls_filter.filter(disparity_grayscale_l, self.left_image, None, disparity_grayscale_r)
+            filteredImg = cv2.normalize(src=filteredImg, dst=filteredImg, beta=1,
+            alpha=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F);
+            filteredImg = np.uint8(filteredImg)
+
+            filteredImg = cv2.applyColorMap(filteredImg,self.colormap)
+
+
+            self.filteredImg = filteredImg#self.wlsfilter(disparity_fixtype_l, disparity_grayscale_r)#disparity_color_l#disparity#disparity#disparity_color
             self.disparity_color = disparity_color_l
             self.disparity_gray = disparity_fixtype_l
 
