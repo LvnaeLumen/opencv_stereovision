@@ -11,6 +11,7 @@ import json
 import threading
 from camera import *
 from disparity import *
+from pointcloud import *
 import multiprocessing
 import queue
 
@@ -122,6 +123,8 @@ def redrawCams():
 trackerEvent = False
 
 
+
+
 def main(argv=sys.argv):
 
 
@@ -176,9 +179,30 @@ def main(argv=sys.argv):
     flagS_LINES = False
     flagC_CALIB = True
     flagN_POINT = False
+    flagX_3D = False
 
     obj_rects = []
     obj_centers = []
+
+    angles = {  # x, z
+        'w': (-np.pi/4, 0),
+        's': (np.pi/4, 0),
+        'a': (0, np.pi/4),
+        'd': (0, -np.pi/4)
+        }
+    r = np.eye(3)
+    t = np.array([0, 0.0, 100.5])
+
+    def rotate(arr, anglex, anglez):
+        return np.array([  # rx
+            [1, 0, 0],
+            [0, np.cos(anglex), -np.sin(anglex)],
+            [0, np.sin(anglex), np.cos(anglex)]
+        ]).dot(np.array([  # rz
+            [np.cos(anglez), 0, np.sin(anglez)],
+            [0, 1, 0],
+            [-np.sin(anglez), 0, np.cos(anglez)]
+        ])).dot(arr)
 
     fs = cv2.FileStorage("extrinsics.yml", cv2.FILE_STORAGE_READ)
 
@@ -204,7 +228,9 @@ def main(argv=sys.argv):
     depth_map.update_image(frames, grays)
     disp = depth_map.getDisparity()
 
-    #pointcloud = depth_map.getPointCloud()
+    #pointcloud = PointCloud()
+    #pointcloud.update(r,t,depth_map.getDisparity(), frames[0])
+
 
 
 
@@ -213,6 +239,9 @@ def main(argv=sys.argv):
     names = ['Left Image', 'Right Image', 'Left Gray Image', 'Right Gray Image', 'Lines', 'Disp', 'Pointcloud']
 
     i = 0
+
+
+
 
 
 
@@ -236,12 +265,22 @@ def main(argv=sys.argv):
         frames_lines =  np.hstack([left_check, right_check])
 
         depth_map.update_image(frames, grays)
+        depth_map.update_coords(r,t)
         disp = depth_map.getDisparity()
         fim = depth_map.getFilteredImg()
         #depth = depth_map.getDepthMap()
 
+        #pointcloud.update(r,t,disp, frames[0])
+
         show_frames = frames[0], frames[1], grays[0], grays[1], frames_lines, disp
         flags = [flagQ_LEFTSOURCE, flagE_RIGHTSOURCE, flagA_LEFTGRAY, flagD_RIGHTGRAY, flagS_LINES, flagW_DISPARITY, flagN_POINT]
+
+        if(flagX_3D):
+            depth_map.calculatePointCloud()
+        else:
+            cv2.destroyWindow('3D Map')
+
+
 
 
         #disps=  np.hstack([disp, fim])
@@ -263,23 +302,44 @@ def main(argv=sys.argv):
 
         ch = cv2.waitKey(1)
 
-        if ch == ord('q'): #left source image
+
+
+        if ch == ord('y'): #left source image
             flagQ_LEFTSOURCE = not flagQ_LEFTSOURCE
-        if ch == ord('e'): #right source image
+        elif ch == ord('u'): #right source image
             flagE_RIGHTSOURCE = not flagE_RIGHTSOURCE
-        if ch == ord('a'): #left gray image
+        elif ch == ord('h'): #left gray image
             flagA_LEFTGRAY = not flagA_LEFTGRAY
-        if ch == ord('d'): #right gray image
+        elif ch == ord('j'): #right gray image
             flagD_RIGHTGRAY = not flagD_RIGHTGRAY
-        if ch == ord('w'): #disparity
+        elif ch == ord('b'): #disparity
             flagW_DISPARITY = not flagW_DISPARITY
-        if ch == ord('s'): #both with Lines
+        elif ch == ord('n'): #both with Lines
             flagS_LINES = not flagS_LINES
-        if ch == ord('c'): #use calibration
+        elif ch == ord('c'): #use calibration
             flagC_CALIB = not flagC_CALIB
-        if ch == ord('n'): #use calibration
-            depth_map.calculatePointCloud()
-        if ch == ord('t'): #reset trackbar
+        elif ch == ord('x'): #depth map
+            flagX_3D = not flagX_3D
+
+        elif (ch == ord('w')):
+            ax, az = -np.pi/8, 0
+            r = rotate(r, -ax, -az)
+        elif (ch == ord('a')):
+            ax, az = 0, np.pi/8
+            r = rotate(r, -ax, -az)
+        elif (ch == ord('s')):
+            ax, az = np.pi/8, 0
+            r = rotate(r, -ax, -az)
+        elif (ch == ord('d')):
+            ax, az = 0, -np.pi/8
+            r = rotate(r, -ax, -az)
+
+        elif ch == ord('1'):   # decrease camera distance from the point cloud
+            t[2] -= 100
+        elif ch == ord('2'): # decrease camera distance from the point cloud
+            t[2] += 100
+
+        elif ch == ord('t'): #reset trackbar
             print("Reset trackbar cameras")
             #tr = resetTrackabarValuesRaw()
             cv2.setTrackbarPos('SGBM mode', 'Disparity', 2)
@@ -289,16 +349,17 @@ def main(argv=sys.argv):
             cv2.setTrackbarPos('windowSize', 'Disparity', 5)
             cv2.setTrackbarPos('Focal length', 'Disparity',  0)
             cv2.setTrackbarPos('Color Map', 'Disparity', 4)
-        if ch == ord('r'): #swap cameras
+        elif ch == ord('r'): #swap cameras
             print("Swap cameras")
             cameras.swapCameras()
 
-        if ch == 27:
+        elif ch == 27:
             break
 
 
     cameras.stop()
     depth_map.stop()
+    pointcloud.stop()
 
     # fs = cv2.FileStorage('config.yml', cv2.FILE_STORAGE_WRITE)
     # fs.write('sgbm_mode',sgbm_mode)

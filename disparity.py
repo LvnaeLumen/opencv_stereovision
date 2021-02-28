@@ -3,6 +3,7 @@ import threading
 import numpy as np
 import camera
 from pointcloud import PointCloud
+import misc
 
 
 lmbda = 80000
@@ -36,7 +37,7 @@ class DisparityCalc(threading.Thread):
         self.preFilterCap = 5
         self.speckleRange  = 32
         self.colormap = 4
-        self.Q = Q
+
 
         self.left_color = color_frames[0]
         self.right_color = color_frames[1]
@@ -47,6 +48,15 @@ class DisparityCalc(threading.Thread):
         self.lmbda = 80000
         self.sigma = 1.8
 
+
+        self.r = np.eye(3)
+        self.t = np.array([0, 0.0, 100.5])
+
+        coeffs = misc.getCalibData()
+
+        self.M1 = coeffs['M1']
+        self.M2 = coeffs['M2']
+        self.Q = coeffs['Q']
 
         self.stereoSGBM = cv2.StereoSGBM_create(
         minDisparity = self.minDisparity,
@@ -114,69 +124,17 @@ class DisparityCalc(threading.Thread):
     def update_image(self, color_frames, gray_frames):
 
 
-        self.left_color = color_frames[0]
-        self.right_color = color_frames[1]
+        self.left_color = color_frames[0]#[10:480,100:640]
+        self.right_color = color_frames[1]#[10:480,100:640]
 
-        self.left_image = gray_frames[0]
-        self.right_image = gray_frames[1]
+        self.left_image = gray_frames[0]#[10:480,100:640]
+        self.right_image = gray_frames[1]#[10:480,100:640]
 
-    def getCalibData(self):
+    def update_coords(self, r,t):
+        self.r = r
+        self.t = t
 
-        ret = dict()
 
-
-        fs = cv2.FileStorage("extrinsics.yml", cv2.FILE_STORAGE_READ)
-        fn = fs.getNode("R")
-        R = fn.mat()
-
-        ret['R'] = R
-
-        fn = fs.getNode("T")
-        T = fn.mat()
-        ret['T'] = T
-
-        fn = fs.getNode("R1")
-        R1 = fn.mat()
-        ret['R1'] = R1
-
-        fn = fs.getNode("R2")
-        R2 = fn.mat()
-        ret['R2'] = R2
-
-        fn = fs.getNode("P1")
-        P1 = fn.mat()
-        ret['P1'] = P1
-
-        fn = fs.getNode("P2")
-        P2 = fn.mat()
-        ret['P2'] = P2
-
-        fn = fs.getNode("Q")
-        Q = fn.mat()
-        ret['Q'] = Q
-
-        fs.release()
-
-        fs = cv2.FileStorage("intrinsics.yml", cv2.FILE_STORAGE_READ)
-
-        fn = fs.getNode("M1")
-        M1 = fn.mat()
-        ret['M1'] = M1
-
-        fn = fs.getNode("D1")
-        D1 = fn.mat()
-        ret['D1'] = D1
-
-        fn = fs.getNode("M2")
-        M2 = fn.mat()
-        ret['M2'] = M2
-
-        fn = fs.getNode("D2")
-        D2 = fn.mat()
-        ret['D2'] = D2
-
-        fs.release()
-        return ret
 
     def wlsfilter(self, disparity_left, disparity_right):
         wls_filter = cv2.ximgproc.createDisparityWLSFilter(matcher_left=self.stereoSGBM)
@@ -217,14 +175,16 @@ class DisparityCalc(threading.Thread):
         right_matcher = cv2.ximgproc.createRightMatcher(left_matcher)
 
 
+
+
         displ = left_matcher.compute(self.left_image, self.right_image)#.astype(np.float32)/16
         dispr = right_matcher.compute(self.right_image, self.left_image)  # .astype(np.float32)/16
 
-        displ = np.float32(displ)
-        dispr = np.float32(dispr)
+        #displ = np.float32(displ)
+        #dispr = np.float32(dispr)
 
-        #displ= ((displ.astype(np.float32)/16)-self.minDisparity)/self.numDisparities
-        #dispr= ((dispr.astype(np.float32)/16)-self.minDisparity)/self.numDisparities
+        displ= displ.astype(np.float32)/16.0#-self.minDisparity)/self.numDisparities
+        dispr= dispr.astype(np.float32)/16.0#-self.minDisparity)/self.numDisparities
 
         local_max = displ.max()
         local_min = displ.min()
@@ -242,66 +202,102 @@ class DisparityCalc(threading.Thread):
         #disparity_fixtype_r= disparity_fixtype_r.astype(np.uint8)
         #disparity_color_r = cv2.applyColorMap(disparity_fixtype_r, self.colormap)
 
-        return disparity_color_l, disparity_fixtype_l, disparity_fixtype_r, displ, dispr#disparity_grayscale_l, disparity_grayscale_r
+        return disparity_color_l, disparity_fixtype_l, displ, dispr#disparity_grayscale_l, disparity_grayscale_r
 
 
     def run(self):
         while not self.stop_event.is_set():
 
 
-            disparity_color_l, disparity_fixtype_l, disparity_fixtype_r, disparity_grayscale_l, disparity_grayscale_r = self.stereo_depth_map_stereo()
-
-            left_matcher = self.stereoSGBM
-            wls_filter = cv2.ximgproc.createDisparityWLSFilter(matcher_left=left_matcher)
-            wls_filter.setLambda(self.lmbda)
-            wls_filter.setSigmaColor(self.sigma)
-
-            filteredImg = wls_filter.filter(disparity_grayscale_l, self.left_image, None, disparity_grayscale_r)
-            filteredImg = cv2.normalize(src=filteredImg, dst=filteredImg, beta=1,
-            alpha=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F);
-            filteredImg = np.uint8(filteredImg)
-
-            filteredImg = cv2.applyColorMap(filteredImg,self.colormap)
+            disparity_color_l, disparity_fixtype_l, disparity_grayscale_l, disparity_grayscale_r = self.stereo_depth_map_stereo()
 
 
-            self.filteredImg = filteredImg#self.wlsfilter(disparity_fixtype_l, disparity_grayscale_r)#disparity_color_l#disparity#disparity#disparity_color
-            self.disparity_color = disparity_color_l
-            self.disparity_gray = disparity_fixtype_l
+
+            self.filteredImg = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l#disparity#disparity#disparity_color
+            self.disparity_color = disparity_color_l#disparity_color_l
+            self.disparity_gray = disparity_grayscale_l
 
 
 
 
 
 
+    def getDisparityGray(self):
+        return self.disparity_gray.copy()
     def getDisparity(self):
-        return self.disparity_color
-
+        return self.disparity_color.copy()
     def getFilteredImg(self):
-        return self.filteredImg
+        return self.filteredImg.copy()
 
 
+    def writePly(self, output_file):
+        """Export ``PointCloud`` to PLY file for viewing in MeshLab."""
+        points = np.hstack([self.coordinates, self.colors])
+        with open(output_file, 'w') as outfile:
+            outfile.write(self.ply_header.format(
+                                            vertex_count=len(self.coordinates)))
+            np.savetxt(outfile, points, '%f %f %f %d %d %d')
+
+    def filterInfinity(self):
+        """Filter infinite distances from ``PointCloud.``"""
+        mask = self.coordinates[:, 2] > self.coordinates[:, 2].min()
+        coords = self.coordinates[mask]
+        colors = self.colors[mask]
+        return PointCloud(coords, colors)
+
+    ply_header = (
+'''ply
+format ascii 1.0
+element vertex {vertex_count}
+property float x
+property float y
+property float z
+property uchar red
+property uchar green
+property uchar blue
+end_header
+''')
     def calculatePointCloud(self):
-        rev_proj_matrix = np.zeros((4,4)) # to store the output
+        rev_proj_matrix = np.zeros((4,1)) # to store the output
 
-        calib_data = self.getCalibData()
+        calib_data = misc.getCalibData()
 
-        points = cv2.reprojectImageTo3D(self.disparity_gray, calib_data['Q'])
-        colors = self.left_color
+        points = cv2.reprojectImageTo3D(self.disparity_gray, calib_data['Q'])#.reshape(-1, 3)
+        colors = self.left_color#.reshape(-1, 3)
         mask_map = self.disparity_gray > self.disparity_gray.min()
 
         output_points = points[mask_map]
         output_colors = colors[mask_map]
 
-        pc = PointCloud(output_points, output_colors)
-        pc.filter_infinity()
 
-        pc.write_ply('pointcloud.ply')
-
+        pi = self.calc_projected_image(output_points, output_colors, self.r, self.t, calib_data['M1'], rev_proj_matrix, 640, 480)
+        cv2.imshow("3D Map", pi)
 
 
+        #points = np.hstack([coordinates, colors])
+        #with open('pointcloud.ply', 'w') as outfile:
+        #    outfile.write(self.ply_header.format(
+        #
+        #    np.savetxt('pointcloud.ply', points, '%f %f %f %d %d %d')
 
+    def calc_projected_image(self,points, colors, r, t, k, dist_coeff, width, height):
+        xy, cm = self.project_points(points, colors, r, t, k, dist_coeff, width, height)
+        image = np.zeros((height, width, 3), dtype=colors.dtype)
+        image[xy[:, 1], xy[:, 0]] = cm
+        return image
 
-
+    def project_points(self,points, colors, r, t, k, dist_coeff, width, height):
+        projected, _ = cv2.projectPoints(points, r, t, k, dist_coeff)
+        xy = projected.reshape(-1, 2).astype(np.int)
+        mask = (
+            (0 <= xy[:, 0]) & (xy[:, 0] < width) &
+            (0 <= xy[:, 1]) & (xy[:, 1] < height)
+        )
+        #print ("Colors shape: "+str(colors.shape))
+        #colors.reshape(-1,3)
+        #print ("Colors REshape: "+str(colors.shape))
+        colorsreturn = colors[mask]
+        return xy[mask], colorsreturn
 
 
     def stop(self):

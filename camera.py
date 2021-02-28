@@ -54,6 +54,7 @@ class CameraAsyncReading(threading.Thread):
 
 
 
+
     def updateFocus(self, focus):
         self.video_capture_0.set(28, focus )
         self.video_capture_1.set(28, focus )
@@ -65,6 +66,7 @@ class CameraAsyncReading(threading.Thread):
         else:
             frame_left = self.frame0
             frame_right = self.frame1
+
         return [frame_left, frame_right]
     def stop(self):
         self.video_capture_0.release()
