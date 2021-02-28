@@ -47,14 +47,6 @@ class DisparityCalc(threading.Thread):
         self.lmbda = 80000
         self.sigma = 1.8
 
-        self.autotune_min = 10000000
-        self.autotune_max = -10000000
-
-        self.min_y = 10000
-        self.max_y = -10000
-        self.min_x =  10000
-        self.max_x = -10000
-
 
         self.stereoSGBM = cv2.StereoSGBM_create(
         minDisparity = self.minDisparity,
@@ -70,10 +62,11 @@ class DisparityCalc(threading.Thread):
         mode = cv2.STEREO_SGBM_MODE_SGBM_3WAY
         )
 
-        self.filteredImg = np.zeros((640, 480, 3), np.int16)
-        self.disparity = np.zeros((640, 480, 3), np.int16)
+
+        #self.disparity_raw = np.zeros((640, 480, 3), np.int16)
         self.disparity_gray = np.zeros((640, 480, 3), np.int16)
-        self.depth = np.zeros((640, 480, 3), np.int16)
+        self.disparity_color = np.zeros((640, 480, 3), np.int16)
+        self.filteredImg = np.zeros((640, 480, 3), np.int16)
         #self.disparity_left_g = np.zeros((640, 480, 3), np.int16)
 
         fs = cv2.FileStorage("extrinsics.yml", cv2.FILE_STORAGE_READ)
@@ -185,7 +178,19 @@ class DisparityCalc(threading.Thread):
         fs.release()
         return ret
 
+    def wlsfilter(self, disparity_left, disparity_right):
+        wls_filter = cv2.ximgproc.createDisparityWLSFilter(matcher_left=self.stereoSGBM)
+        wls_filter.setLambda(self.lmbda)
+        wls_filter.setSigmaColor(self.sigma)
 
+        filteredImg = wls_filter.filter(disparity_left, self.left_image, None, disparity_right)
+        filteredImg = cv2.normalize(src=filteredImg, dst=filteredImg, beta=0,
+        alpha=256, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F);
+        filteredImg = np.uint8(filteredImg)
+
+        filteredImg = cv2.applyColorMap(filteredImg,self.colormap)
+
+        return filteredImg
 
     def stereo_depth_map_single(self):
 
@@ -194,38 +199,69 @@ class DisparityCalc(threading.Thread):
         local_min = disparity.min()
         disparity_grayscale = (disparity-local_min)*(65535.0/(local_max-local_min))
         disparity_fixtype = cv2.convertScaleAbs(disparity_grayscale, alpha=(255.0/65535.0))
+
+
+        disparity_fixtype= cv2.morphologyEx(disparity_fixtype,cv2.MORPH_CLOSE, kernel) # Apply an morphological filter for closing little "black" holes in the picture(Remove noise)
+
+    # Colors map
+        disparity_fixtype= (disparity_fixtype-disparity_fixtype.min())*255
+        disparity_fixtype= disparity_fixtype.astype(np.uint8)
+
         disparity_color = cv2.applyColorMap(disparity_fixtype, self.colormap)
 
         return disparity_color, disparity_fixtype, disparity
 
     def stereo_depth_map_stereo(self):
 
-        disparity = self.stereoSGBM.compute(self.left_image, self.right_image)
-        local_max = disparity.max()
-        local_min = disparity.min()
-        disparity_grayscale = (disparity-local_min)*(65535.0/(local_max-local_min))
-        disparity_fixtype = cv2.convertScaleAbs(disparity_grayscale, alpha=(255.0/65535.0))
-        disparity_color = cv2.applyColorMap(disparity_fixtype, self.colormap)
+        left_matcher = self.stereoSGBM
+        right_matcher = cv2.ximgproc.createRightMatcher(left_matcher)
 
-        return disparity_color, disparity_fixtype, disparity
+
+        displ = left_matcher.compute(self.left_image, self.right_image)#.astype(np.float32)/16
+        dispr = right_matcher.compute(self.right_image, self.left_image)  # .astype(np.float32)/16
+
+        displ = np.float32(displ)
+        dispr = np.float32(dispr)
+
+        #displ= ((displ.astype(np.float32)/16)-self.minDisparity)/self.numDisparities
+        #dispr= ((dispr.astype(np.float32)/16)-self.minDisparity)/self.numDisparities
+
+        local_max = displ.max()
+        local_min = displ.min()
+        #disparity_grayscale_l = displ
+        disparity_grayscale_l = (displ-local_min)*(65535.0/(local_max-local_min))
+        disparity_fixtype_l = cv2.convertScaleAbs(disparity_grayscale_l, alpha=(255.0/65535.0))
+
+        disparity_fixtype_l= cv2.morphologyEx(disparity_fixtype_l,cv2.MORPH_CLOSE, kernel) # Apply an morphological filter for closing little "black" holes in the picture(Remove noise)
+
+    # Colors map
+        #disparity_fixtype_l= (disparity_fixtype_l-disparity_fixtype_l.min())*255
+        #disparity_fixtype_l= disparity_fixtype_l.astype(np.uint8)
+
+        disparity_color_l = cv2.applyColorMap(disparity_fixtype_l, self.colormap)
+
+        local_max = dispr.max()
+        local_min = dispr.min()
+        #disparity_grayscale_r = dispr
+        disparity_grayscale_r = (dispr-local_min)*(65535.0/(local_max-local_min))
+        disparity_fixtype_r = cv2.convertScaleAbs(disparity_grayscale_r, alpha=(255.0/65535.0))
+        #disparity_fixtype_r= (disparity_fixtype_r-disparity_fixtype_r.min())*255
+        #disparity_fixtype_r= disparity_fixtype_r.astype(np.uint8)
+        #disparity_color_r = cv2.applyColorMap(disparity_fixtype_r, self.colormap)
+
+        return disparity_color_l, disparity_fixtype_l, disparity_fixtype_r, displ, dispr
 
 
     def run(self):
         while not self.stop_event.is_set():
 
 
-            disparity_color, disparity_fixtype_gray, disparity_raw = self.stereo_depth_map_single()
-
-            
-            if self.autotune_max < np.amax(disparity_raw):
-                self.autotune_max = np.amax(disparity_raw)
-            if self.autotune_min > np.amin(disparity_raw):
-                self.autotune_min = np.amin(disparity_raw)
+            disparity_color_l, disparity_fixtype_l, disparity_fixtype_r, disparity_grayscale_l, disparity_grayscale_r = self.stereo_depth_map_stereo()
 
 
-            self.disparity = disparity_color_2#disparity_fixtype_gray#max_line_color#native_disparity
-            self.disparity_gray = disparity_fixtype_gray#disparity_bw
-            self.filteredImg = disparity_color#disparity#disparity#disparity_color
+            self.filteredImg = self.wlsfilter(disparity_fixtype_l, disparity_fixtype_r)#disparity_color_l#disparity#disparity#disparity_color
+            self.disparity_color = disparity_color_l
+            self.disparity_gray = disparity_fixtype_l
 
 
 
@@ -233,15 +269,10 @@ class DisparityCalc(threading.Thread):
 
 
     def getDisparity(self):
-        return self.disparity
+        return self.disparity_color
 
     def getFilteredImg(self):
         return self.filteredImg
-
-    def getDepthMap(self):
-        return self.depth
-
-
 
 
     def calculatePointCloud(self):
