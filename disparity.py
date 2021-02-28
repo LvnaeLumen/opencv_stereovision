@@ -231,17 +231,10 @@ class DisparityCalc(threading.Thread):
         #disparity_grayscale_l = displ
         disparity_grayscale_l = (displ-local_min)*(65535.0/(local_max-local_min))
         disparity_fixtype_l = cv2.convertScaleAbs(disparity_grayscale_l, alpha=(255.0/65535.0))
-
-        disparity_fixtype_l= cv2.morphologyEx(disparity_fixtype_l,cv2.MORPH_CLOSE, kernel) # Apply an morphological filter for closing little "black" holes in the picture(Remove noise)
-
-    # Colors map
-        #disparity_fixtype_l= (disparity_fixtype_l-disparity_fixtype_l.min())*255
-        #disparity_fixtype_l= disparity_fixtype_l.astype(np.uint8)
-
         disparity_color_l = cv2.applyColorMap(disparity_fixtype_l, self.colormap)
 
-        local_max = dispr.max()
-        local_min = dispr.min()
+        #ocal_max = dispr.max()
+        #local_min = dispr.min()
         #disparity_grayscale_r = dispr
         disparity_grayscale_r = (dispr-local_min)*(65535.0/(local_max-local_min))
         disparity_fixtype_r = cv2.convertScaleAbs(disparity_grayscale_r, alpha=(255.0/65535.0))
