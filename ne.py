@@ -320,6 +320,8 @@ def main(argv=sys.argv):
             flagC_CALIB = not flagC_CALIB
         elif ch == ord('x'): #depth map
             flagX_3D = not flagX_3D
+        elif ch == ord('z'): #depth map
+            depth_map.writePly()
 
         elif (ch == ord('w')):
             ax, az = -np.pi/8, 0
@@ -359,7 +361,7 @@ def main(argv=sys.argv):
 
     cameras.stop()
     depth_map.stop()
-    pointcloud.stop()
+    #pointcloud.stop()
 
     # fs = cv2.FileStorage('config.yml', cv2.FILE_STORAGE_WRITE)
     # fs.write('sgbm_mode',sgbm_mode)

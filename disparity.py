@@ -38,6 +38,19 @@ class DisparityCalc(threading.Thread):
         self.speckleRange  = 32
         self.colormap = 4
 
+        self.ply_header = (
+    '''ply
+    format ascii 1.0
+    element vertex {vertex_count}
+    property float x
+    property float y
+    property float z
+    property uchar red
+    property uchar green
+    property uchar blue
+    end_header
+    ''')
+
 
         self.left_color = color_frames[0]
         self.right_color = color_frames[1]
@@ -78,6 +91,9 @@ class DisparityCalc(threading.Thread):
         self.disparity_color = np.zeros((640, 480, 3), np.int16)
         self.filteredImg = np.zeros((640, 480, 3), np.int16)
         #self.disparity_left_g = np.zeros((640, 480, 3), np.int16)
+
+        self.output_points = np.zeros((640, 480, 3), np.int16)
+        self.output_colors = np.zeros((640, 480, 3), np.int16)
 
         fs = cv2.FileStorage("extrinsics.yml", cv2.FILE_STORAGE_READ)
         fn = fs.getNode("Q")
@@ -159,11 +175,11 @@ class DisparityCalc(threading.Thread):
         disparity_fixtype = cv2.convertScaleAbs(disparity_grayscale, alpha=(255.0/65535.0))
 
 
-        disparity_fixtype= cv2.morphologyEx(disparity_fixtype,cv2.MORPH_CLOSE, kernel) # Apply an morphological filter for closing little "black" holes in the picture(Remove noise)
+        #disparity_fixtype= cv2.morphologyEx(disparity_fixtype,cv2.MORPH_CLOSE, kernel) # Apply an morphological filter for closing little "black" holes in the picture(Remove noise)
 
     # Colors map
-        disparity_fixtype= (disparity_fixtype-disparity_fixtype.min())*255
-        disparity_fixtype= disparity_fixtype.astype(np.uint8)
+        #disparity_fixtype= (disparity_fixtype-disparity_fixtype.min())*255
+        #disparity_fixtype= disparity_fixtype.astype(np.uint8)
 
         disparity_color = cv2.applyColorMap(disparity_fixtype, self.colormap)
 
@@ -210,13 +226,12 @@ class DisparityCalc(threading.Thread):
 
 
             disparity_color_l, disparity_fixtype_l, disparity_grayscale_l, disparity_grayscale_r = self.stereo_depth_map_stereo()
+            #disparity_color_l, disparity_fixtype, disparity_grayscale_l = self.stereo_depth_map_single()
 
 
-
-            self.filteredImg = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l#disparity#disparity#disparity_color
-            self.disparity_color = disparity_color_l#disparity_color_l
+            self.filteredImg = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)
+            self.disparity_color =disparity_color_l
             self.disparity_gray = disparity_grayscale_l
-
 
 
 
@@ -230,47 +245,57 @@ class DisparityCalc(threading.Thread):
         return self.filteredImg.copy()
 
 
-    def writePly(self, output_file):
-        """Export ``PointCloud`` to PLY file for viewing in MeshLab."""
-        points = np.hstack([self.coordinates, self.colors])
-        with open(output_file, 'w') as outfile:
+
+
+
+    def writePly(self):
+        #verts = self.output_points.reshape(-1, 3)
+        #colors = self.output_colors.reshape(-1, 3)
+        points = np.hstack([self.output_points, self.output_colors])
+        with open('pointcloud.py', 'w') as outfile:
             outfile.write(self.ply_header.format(
-                                            vertex_count=len(self.coordinates)))
+                                            vertex_count=len(self.output_points)))
             np.savetxt(outfile, points, '%f %f %f %d %d %d')
+        print ("Pointcloud saved")
 
-    def filterInfinity(self):
-        """Filter infinite distances from ``PointCloud.``"""
-        mask = self.coordinates[:, 2] > self.coordinates[:, 2].min()
-        coords = self.coordinates[mask]
-        colors = self.colors[mask]
-        return PointCloud(coords, colors)
 
-    ply_header = (
-'''ply
-format ascii 1.0
-element vertex {vertex_count}
-property float x
-property float y
-property float z
-property uchar red
-property uchar green
-property uchar blue
-end_header
-''')
     def calculatePointCloud(self):
         rev_proj_matrix = np.zeros((4,1)) # to store the output
 
         calib_data = misc.getCalibData()
 
-        points = cv2.reprojectImageTo3D(self.disparity_gray, calib_data['Q'])#.reshape(-1, 3)
-        colors = self.left_color#.reshape(-1, 3)
-        mask_map = self.disparity_gray > self.disparity_gray.min()
+        disp = self.disparity_gray
+
+        points = cv2.reprojectImageTo3D(disp, calib_data['Q']).reshape(-1, 3)
+
+        image_dim = self.left_color.ndim
+        if (image_dim == 2):  # grayscale
+            colors = self.left_color.reshape(-1, 1)
+        elif (image_dim == 3): #color
+            colors = self.left_color.reshape(-1, 3)
+
+        disp = disp.reshape(-1)
+
+        mask_map = (
+            (disp > disp.min()) &
+            #(disp_arr < disp_arr.max()) &
+            np.all(~np.isnan(points), axis=1) &
+            np.all(~np.isinf(points), axis=1)
+        )
 
         output_points = points[mask_map]
         output_colors = colors[mask_map]
 
+        mask = points[:, 2] > points[:, 2].min()
+        coords = points[mask]
+        colors = colors[mask]
+
+        self.output_points = output_points
+        self.output_colors = output_colors
+
 
         pi = self.calc_projected_image(output_points, output_colors, self.r, self.t, calib_data['M1'], rev_proj_matrix, 640, 480)
+        pi = cv2.resize (pi, dsize=(640, 362), interpolation = cv2.INTER_CUBIC)
         cv2.imshow("3D Map", pi)
 
 
@@ -293,9 +318,7 @@ end_header
             (0 <= xy[:, 0]) & (xy[:, 0] < width) &
             (0 <= xy[:, 1]) & (xy[:, 1] < height)
         )
-        #print ("Colors shape: "+str(colors.shape))
-        #colors.reshape(-1,3)
-        #print ("Colors REshape: "+str(colors.shape))
+
         colorsreturn = colors[mask]
         return xy[mask], colorsreturn
 
