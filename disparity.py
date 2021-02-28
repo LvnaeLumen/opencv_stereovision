@@ -8,6 +8,9 @@ from pointcloud import PointCloud
 lmbda = 80000
 sigma = 1.8
 
+map_width = 640
+map_height = 480
+
 kernel= np.ones((3,3),np.uint8)
 
 class DisparityCalc(threading.Thread):
@@ -44,6 +47,13 @@ class DisparityCalc(threading.Thread):
         self.lmbda = 80000
         self.sigma = 1.8
 
+        self.autotune_min = 10000000
+        self.autotune_max = -10000000
+
+        self.min_y = 10000
+        self.max_y = -10000
+        self.min_x =  10000
+        self.max_x = -10000
 
 
         self.stereoSGBM = cv2.StereoSGBM_create(
@@ -91,6 +101,9 @@ class DisparityCalc(threading.Thread):
 
         self.lmbda = lmbda
         self.sigma = sigma
+
+        self.P1 = 8*3*self.windowSize**2
+        self.P2 = 32*3*self.windowSize**2
 
 
         self.stereoSGBM = cv2.StereoSGBM_create(
@@ -174,80 +187,46 @@ class DisparityCalc(threading.Thread):
 
 
 
+    def stereo_depth_map_single(self):
+
+        disparity = self.stereoSGBM.compute(self.left_image, self.right_image)
+        local_max = disparity.max()
+        local_min = disparity.min()
+        disparity_grayscale = (disparity-local_min)*(65535.0/(local_max-local_min))
+        disparity_fixtype = cv2.convertScaleAbs(disparity_grayscale, alpha=(255.0/65535.0))
+        disparity_color = cv2.applyColorMap(disparity_fixtype, self.colormap)
+
+        return disparity_color, disparity_fixtype, disparity
+
+    def stereo_depth_map_stereo(self):
+
+        disparity = self.stereoSGBM.compute(self.left_image, self.right_image)
+        local_max = disparity.max()
+        local_min = disparity.min()
+        disparity_grayscale = (disparity-local_min)*(65535.0/(local_max-local_min))
+        disparity_fixtype = cv2.convertScaleAbs(disparity_grayscale, alpha=(255.0/65535.0))
+        disparity_color = cv2.applyColorMap(disparity_fixtype, self.colormap)
+
+        return disparity_color, disparity_fixtype, disparity
+
+
     def run(self):
         while not self.stop_event.is_set():
 
 
-            left_matcher = self.stereoSGBM
-            right_matcher = cv2.ximgproc.createRightMatcher(left_matcher)
+            disparity_color, disparity_fixtype_gray, disparity_raw = self.stereo_depth_map_single()
 
-            wls_filter = cv2.ximgproc.createDisparityWLSFilter(matcher_left=left_matcher)
-            wls_filter.setLambda(self.lmbda)
-            wls_filter.setSigmaColor(self.sigma)
-
-            displ = left_matcher.compute(self.left_image, self.right_image)#.astype(np.float32)/16
-            dispr = right_matcher.compute(self.right_image, self.left_image)  # .astype(np.float32)/16
-
-            displ = np.float32(displ)
-            dispr = np.float32(dispr)
-
-            #displ= ((displ.astype(np.float32)/16)-self.minDisparity)/self.numDisparities # Calculation allowing us to have 0 for the most distant object able to detect
-            #dispr= ((dispr.astype(np.float32)/16)-self.minDisparity)/self.numDisparities # Calculation allowing us to have 0 for the most distant object able to detect
+            
+            if self.autotune_max < np.amax(disparity_raw):
+                self.autotune_max = np.amax(disparity_raw)
+            if self.autotune_min > np.amin(disparity_raw):
+                self.autotune_min = np.amin(disparity_raw)
 
 
-            local_max = displ.max()
-            local_min = displ.min()
-            #disparity_grayscale_l = displ
-            disparity_grayscale_l = (displ-local_min)*(65535.0/(local_max-local_min))
-            disparity_fixtype_l = cv2.convertScaleAbs(disparity_grayscale_l, alpha=(255.0/65535.0))
-            disparity_color_l = cv2.applyColorMap(disparity_fixtype_l, self.colormap)
+            self.disparity = disparity_color_2#disparity_fixtype_gray#max_line_color#native_disparity
+            self.disparity_gray = disparity_fixtype_gray#disparity_bw
+            self.filteredImg = disparity_color#disparity#disparity#disparity_color
 
-            local_max = dispr.max()
-            local_min = dispr.min()
-            #disparity_grayscale_r = dispr
-            disparity_grayscale_r = (dispr-local_min)*(65535.0/(local_max-local_min))
-            disparity_fixtype_r = cv2.convertScaleAbs(disparity_grayscale_r, alpha=(255.0/65535.0))
-            disparity_color_r = cv2.applyColorMap(disparity_fixtype_r, self.colormap)
-
-
-
-            filteredImg = wls_filter.filter(disparity_fixtype_l, self.left_image, None, disparity_fixtype_r)
-            filteredImg = wls_filter.filter(displ, self.left_image, None, dispr)
-            filteredImg = cv2.normalize(src=filteredImg, dst=filteredImg, beta=0,
-            alpha=256, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F);
-            filteredImg = np.uint8(filteredImg)
-
-            filteredImg = cv2.applyColorMap(filteredImg,self.colormap)
-
-
-            #OPTIONAL
-            # depth= ((depth.astype(np.float32)/ 16)-self.minDisparity)/self.numDisparities
-            # depth = cv2.morphologyEx(depth,cv2.MORPH_CLOSE, kernel)
-            # depth= (depth-depth.min())*255
-            # depth= depth.astype(np.int16)
-
-            #cam1 = calib_matrix_P2[:,:3] # left color image
-            #cam2 = calib_matrix_P3[:,:3] # right color imagerev_proj_matrix = np.zeros((4,4)) # to store the outputcv2.stereoRectify(cameraMatrix1 = cam1,cameraMatrix2 = cam2,
-
-            #depth = reshape(depth, [], 3);
-
-
-            # cv2.stereoRectify(cameraMatrix1 = self.left_color,
-            #         cameraMatrix2 = self.right_color,
-            #       distCoeffs1 = 0, distCoeffs2 = 0,
-            #       imageSize = disparity_color_l.shape[:2],
-            #       R = calib_data['R'], T = calib_data['T'],
-            #       R1 = calib_data['R1'], R2 = calib_data['R2'],
-            #       P1 =  calib_data['P1'], P2 =  calib_data['P2'],
-            #       Q = calib_data['Q'])
-
-
-
-            self.disparity = disparity_color_l
-            self.disparity_gray = disparity_fixtype_l
-
-
-            self.filteredImg = filteredImg
 
 
 
