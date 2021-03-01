@@ -11,7 +11,7 @@ import json
 import threading
 from camera import *
 from disparity import *
-from pointcloud import *
+#from pointcloud import *
 import multiprocessing
 import queue
 
@@ -180,6 +180,7 @@ def main(argv=sys.argv):
     flagC_CALIB = True
     flagN_POINT = False
     flagX_3D = False
+    flagG_DISTCENTER = False
 
     obj_rects = []
     obj_centers = []
@@ -280,6 +281,11 @@ def main(argv=sys.argv):
         else:
             cv2.destroyWindow('3D Map')
 
+        if(flagG_DISTCENTER):
+            cv2.imshow("Distance to", depth_map.putDistanceOnImage(disp))
+        else:
+            cv2.destroyWindow("Distance to")
+
 
 
 
@@ -322,6 +328,8 @@ def main(argv=sys.argv):
             flagX_3D = not flagX_3D
         elif ch == ord('z'): #depth map
             depth_map.writePly()
+        elif ch == ord('g'): #distance to center
+            flagG_DISTCENTER = not flagG_DISTCENTER
 
         elif (ch == ord('w')):
             ax, az = -np.pi/8, 0

@@ -1,5 +1,13 @@
-from pyntcloud import PyntCloud
+import numpy as np
+import open3d-python as o3d
 
-human_face = PyntCloud.from_file("pointcloud.ply")
+# Read .ply file
+input_file = "pointcloud.ply"
+pcd = o3d.read_point_cloud(input_file) # Read the point cloud
 
-human_face.plot()
+# Visualize the point cloud within open3d
+o3d.draw_geometries([pcd])
+
+# Convert open3d format to numpy array
+# Here, you have the point cloud in numpy format.
+point_cloud_in_numpy = np.asarray(pcd.points)

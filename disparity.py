@@ -2,7 +2,7 @@ import cv2
 import threading
 import numpy as np
 import camera
-from pointcloud import PointCloud
+#from pointcloud import PointCloud
 import misc
 
 
@@ -233,6 +233,15 @@ class DisparityCalc(threading.Thread):
             self.disparity_color =disparity_color_l
             self.disparity_gray = disparity_grayscale_l
 
+    def putDistanceOnImage(self, disp, x=320, y=240):
+        dist = self.getDistanceToPoint(320, 240)
+        cv2.putText(disp, str(dist)+ " m",
+        (300, 220), cv2.FONT_HERSHEY_SIMPLEX,
+            1.0, (255,0,0), 3)
+        #cv2.rectangle(disp, (x, y), (x + w, y + h), (255,0,0), 2)
+        cv2.circle(disp, (320, 240), 20, (255,0,0),  2)
+        return disp
+
 
 
 
@@ -327,19 +336,43 @@ class DisparityCalc(threading.Thread):
 
         self.stop_event.set()
         self._running = False
+    def getDistanceToPoint(self,x,y):
+        average=0
+        for u in range (-1,2):
+            for v in range (-1,2):
+                average += self.disparity_gray[y+u,x+v] #using SGBM in area
+        distance=average/9
+
+        # // compute the real-world distance [mm]
+        # float fMaxDistance = static_cast<float>((1. / Q.at<double>(3, 2)) * Q.at<double>(2, 3));
+        #
+        # // outputDisparityValue is single 16-bit value from disparityMap
+        # // DISP_SCALE = 16
+        # float fDisparity = outputDisparityValue / (float)StereoMatcher::DISP_SCALE;
+        # float fDistance = fMaxDistance / fDisparity;
+
+
+        # f_x = self.M1[0][0]
+        # f_y = self.M1[1][1]
+        # c_x = self.M1[0][2]
+        # c_y = self.M1[1][2]
+        #
+        # mx = f_x / 3.67
+        # my = f_y / 3.67
+        #
+        # print(f_x, f_y, mx,my, c_x, c_y)
+        distance = 93.8*3.77*3.77*3.67/distance
+
+
+        #distance= -593.97*distance**(3) + 1506.8*distance**(2) - 1373.1*distance + 522.06
+        distance= np.around(distance*0.01,decimals=2)
+        #cubic equation from source (experimental)
+        #distance= np.around(distance*0.01,decimals=2)
+        return distance
 
 
     def coords_mouse_disp(self, event,x,y,flags,param): #Function measuring distance to object
         if event == cv2.EVENT_LBUTTONDBLCLK: #double leftclick on disparity map (control windwo)
             #print (x,y,disparitySGBM[y,x],sgbm_filteredImg[y,x])
-
-            average=0
-            for u in range (-1,2):
-                for v in range (-1,2):
-                    average += self.filteredImg[y+u,x+v] #using SGBM in area
-            average=average/9
-            distance= -593.97*average**(3) + 1506.8*average**(2) - 1373.1*average + 522.06
-            #cubic equation from source (experimental)
-            distance= np.around(distance*0.01,decimals=2)
-            print(distance)
+            print(self.getDistanceToPoint)
             #return distance
