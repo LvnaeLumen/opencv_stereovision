@@ -231,15 +231,20 @@ class DisparityCalc(threading.Thread):
 
             self.filteredImg = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)
             self.disparity_color =disparity_color_l
-            self.disparity_gray = disparity_grayscale_l
+            self.disparity_gray = disparity_fixtype_l#disparity_grayscale_l
 
     def putDistanceOnImage(self, disp, x=320, y=240):
         dist = self.getDistanceToPoint(320, 240)
         cv2.putText(disp, str(dist)+ " m",
-        (300, 220), cv2.FONT_HERSHEY_SIMPLEX,
-            1.0, (255,0,0), 3)
+        (5, 120), cv2.FONT_HERSHEY_SIMPLEX,
+            0.8, (255,0,0), 2)
+        cv2.putText(disp, "Distance",
+        (5, 80), cv2.FONT_HERSHEY_SIMPLEX,
+            0.8, (255,0,0), 2)
         #cv2.rectangle(disp, (x, y), (x + w, y + h), (255,0,0), 2)
-        cv2.circle(disp, (320, 240), 20, (255,0,0),  2)
+        cv2.circle(disp, (320, 240), 10, (255,255,255),  8)
+        cv2.circle(disp, (320, 240), 10, (0,0,0),  4)
+
         return disp
 
 
@@ -275,7 +280,15 @@ class DisparityCalc(threading.Thread):
 
         disp = self.disparity_gray
 
-        points = cv2.reprojectImageTo3D(disp, calib_data['Q']).reshape(-1, 3)
+        # centroids = [(320 + 240)/ 2), ...
+        #     round(bboxes(:, 2) + bboxes(:, 4) / 2)];
+        # points = cv2.reprojectImageTo3D(disp, calib_data['Q']).reshape(-1, 3)
+        # X = points(:, :, 1)
+        # Y = points(:, :, 2)
+        # Z = points(:, :, 3)
+        # centroids3D = [X(centroidsIdx), Y(centroidsIdx), Z(centroidsIdx)]
+
+        #dists = math.sqrt(sum(centroids3D .^ 2, 2))
 
         image_dim = self.left_color.ndim
         if (image_dim == 2):  # grayscale
@@ -338,10 +351,14 @@ class DisparityCalc(threading.Thread):
         self._running = False
     def getDistanceToPoint(self,x,y):
         average=0
-        for u in range (-1,2):
-            for v in range (-1,2):
-                average += self.disparity_gray[y+u,x+v] #using SGBM in area
-        distance=average/9
+        i=0
+        for u in range (-2,3):
+            for v in range (-2,3):
+                d= self.disparity_gray[y+u,x+v] #using SGBM in area
+                #if (average == 0) or (average - d < 15):
+                average += d
+                i+=1
+        distance=average/i
 
         # // compute the real-world distance [mm]
         # float fMaxDistance = static_cast<float>((1. / Q.at<double>(3, 2)) * Q.at<double>(2, 3));
@@ -361,7 +378,9 @@ class DisparityCalc(threading.Thread):
         # my = f_y / 3.67
         #
         # print(f_x, f_y, mx,my, c_x, c_y)
-        distance = 93.8*3.77*3.77*3.67/distance
+        distance = 101.1*3.77*3.77*3.67/distance
+        #distance = distance * np.linalg.inv(self.M1) * [x, y, 1]
+
 
 
         #distance= -593.97*distance**(3) + 1506.8*distance**(2) - 1373.1*distance + 522.06

@@ -282,9 +282,13 @@ def main(argv=sys.argv):
             cv2.destroyWindow('3D Map')
 
         if(flagG_DISTCENTER):
-            cv2.imshow("Distance to", depth_map.putDistanceOnImage(disp))
-        else:
-            cv2.destroyWindow("Distance to")
+            #cv2.imshow("Distance to",
+            depth_map.putDistanceOnImage(disp)#)
+            cv2.circle(frames[0], (320, 240), 10, (255,255,255),  8)
+            cv2.circle(frames[0], (320, 240), 10, (0,0,0),  4)
+
+        #else:
+            #cv2.destroyWindow("Distance to")
 
 
 
@@ -293,7 +297,7 @@ def main(argv=sys.argv):
         # plt.imshow(disp, cmap='plasma')
         # plt.colorbar()
         # plt.show()
-        cv2.imshow("Disparity", fim)
+        cv2.imshow("Disparity", disp)
 
         cameraAsyncOut(show_frames, flags, names)
 
