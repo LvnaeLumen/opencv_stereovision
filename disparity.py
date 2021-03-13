@@ -210,24 +210,22 @@ class DisparityCalc(threading.Thread):
         #disparity_fixtype_r= disparity_fixtype_r.astype(np.uint8)
         #disparity_color_r = cv2.applyColorMap(disparity_fixtype_r, self.colormap)
 
-        return disparity_color_l, disparity_fixtype_l, displ, dispr#disparity_grayscale_l, disparity_grayscale_r
+        return disparity_color_l, disparity_fixtype_l, disparity_fixtype_r, displ, dispr#disparity_grayscale_l, disparity_grayscale_r
 
 
     def wlsfilter(self, disparity_left, disparity_right):
         wls_filter = cv2.ximgproc.createDisparityWLSFilter(matcher_left=self.stereoSGBM)
-        #wls_filter.setLambda(self.lmbda)
-        #wls_filter.setSigmaColor(self.sigma)
+        wls_filter.setLambda(self.lmbda)
+        wls_filter.setSigmaColor(self.sigma)
 
 
-        disparity_map = wls_filter.filter(disparity_left, self.left_image, None, disparity_right)
-        disparity_map = cv2.normalize(src=disparity_map, dst=disparity_map, beta=1,
-        alpha=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F);
-        disparity_map = np.uint8(disparity_map)
+        disparity_filtered = wls_filter.filter(disparity_left.copy(), self.left_image, None, disparity_right.copy())
+        disparity_filtered = cv2.normalize(src=disparity_filtered, dst=disparity_filtered, beta=1,alpha=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F);
+        disparity_filtered = np.uint8(disparity_filtered)
 
-        disparity_map = cv2.applyColorMap(disparity_map,self.colormap)
+        disparity_filtered = cv2.applyColorMap(disparity_filtered,self.colormap)
 
-        return disparity_map
-
+        return disparity_filtered
 
     def run(self):
         while not self.stop_event.is_set():
@@ -235,19 +233,26 @@ class DisparityCalc(threading.Thread):
 
 
 
-            disparity_color_l, disparity_fixtype_l, disparity_grayscale_l, disparity_grayscale_r = self.stereo_depth_map_stereo()
-            #disparity_color_l, disparity_fixtype, disparity_grayscale_l = self.stereo_depth_map_single()
+
+
 
 
             #self.disparity_map = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l
-            #if(self.rightmatcher):
-            #
+#            if(self.rightmatcher):
+#
 
-            #else:
+            disparity_color_l, disparity_fixtype_l,disparity_fixtype_r, disparity_grayscale_l, disparity_grayscale_r = self.stereo_depth_map_stereo()
+            #disparity_color_l, disparity_fixtype_l, disparity_grayscale_l = self.stereo_depth_map_single()
 
-            #self.disparity_map = disparity_color_l
-            self.disparity_map = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l
-            self.disparity_color = disparity_color_l #
+            #self.disparity_color = disparity_color_l #
+            #self.disparity_color = self.wlsfilter(disparity_fixtype_l, disparity_fixtype_r)
+            self.disparity_color = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l #
+
+            self.disparity_map = disparity_color_l
+
+
+
+            #self.disparity_color = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l #
             self.disparity_gray = disparity_grayscale_l
 
 
@@ -283,63 +288,100 @@ class DisparityCalc(threading.Thread):
 
 
 
-    def writePly(self):
-        #verts = self.output_points.reshape(-1, 3)
-        #colors = self.output_colors.reshape(-1, 3)
-        points = np.hstack([self.output_points, self.output_colors])
-        with open('pointcloud.py', 'w') as outfile:
-            outfile.write(self.ply_header.format(
-                                            vertex_count=len(self.output_points)))
-            np.savetxt(outfile, points, '%f %f %f %d %d %d')
-        print ("Pointcloud saved")
+    def write_ply(self, fn, verts, colors):
+        verts = verts.reshape(-1, 3)
+        colors = colors.reshape(-1, 3)
+        verts = np.hstack([verts, colors])
+        ply_header = '''ply
+        format ascii 1.0
+        element vertex %(vert_num)d
+        property float x
+        property float y
+        property float z
+        property uchar red
+        property uchar green
+        property uchar blue
+        end_header
+        '''
+        with open(fn, 'wb') as f:
+            f.write((ply_header % dict(vert_num=len(verts))).encode('utf-8'))
+            np.savetxt(f, verts, fmt='%f %f %f %d %d %d ')
+    #
+    # def writePly(self):
+    #     #verts = self.output_points.reshape(-1, 3)
+    #     #colors = self.output_colors.reshape(-1, 3)
+    #     points = np.hstack([self.output_points, self.output_colors])
+    #     with open('pointcloud.py', 'w') as outfile:
+    #         outfile.write(self.ply_header.format(
+    #                                         vertex_count=len(self.output_points)))
+    #         np.savetxt(outfile, points, '%f %f %f %d %d %d')
+    #     print ("Pointcloud saved")
 
 
     def calculatePointCloud(self):
-        rev_proj_matrix = np.zeros((4,1)) # to store the output
-
+        # rev_proj_matrix = np.zeros((4,1)) # to store the output
+        #
         calib_data = misc.getCalibData()
+        #
+        # disp = self.disparity_gray
+        #
+        # # centroids = [(320 + 240)/ 2), ...
+        # #     round(bboxes(:, 2) + bboxes(:, 4) / 2)];
+        # # points = cv2.reprojectImageTo3D(disp, calib_data['Q']).reshape(-1, 3)
+        # # X = points(:, :, 1)
+        # # Y = points(:, :, 2)
+        # # Z = points(:, :, 3)
+        # # centroids3D = [X(centroidsIdx), Y(centroidsIdx), Z(centroidsIdx)]
+        #
+        # #dists = math.sqrt(sum(centroids3D .^ 2, 2))
+        #
+        # image_dim = self.left_color.ndim
+        # if (image_dim == 2):  # grayscale
+        #     colors = self.left_color.reshape(-1, 1)
+        # elif (image_dim == 3): #color
+        #     colors = self.left_color.reshape(-1, 3)
+        #
+        # disp = disp.reshape(-1)
+        #
+        # mask_map = (
+        #     (disp > disp.min()) &
+        #     #(disp_arr < disp_arr.max()) &
+        #     np.all(~np.isnan(points), axis=1) &
+        #     np.all(~np.isinf(points), axis=1)
+        # )
+        #
+        # output_points = points[mask_map]
+        # output_colors = colors[mask_map]
+        #
+        # mask = points[:, 2] > points[:, 2].min()
+        # coords = points[mask]
+        # colors = colors[mask]
+        #
+        # self.output_points = output_points
+        # self.output_colors = output_colors
 
-        disp = self.disparity_gray
+        h, w = self.left_image.shape[:2]
+        f = 3.67*3.77                         # guess for focal length
+        Q = self.Q
+        points = cv2.reprojectImageTo3D(self.disparity_gray, Q)
+        colors = self.left_color#cv.cvtColor(imgL, cv.COLOR_BGR2RGB)
+        mask = self.disparity_gray > self.disparity_gray.min()
+        self.output_points = points[mask]
+        self.output_colors = colors[mask]
+        out_fn = 'out.ply'
+        self.write_ply(out_fn, self.output_points, self.output_colors)
+        # out_fn = 'out.ply'
+        # write_ply(out_fn, out_points, out_colors)
+        # print('%s saved' % out_fn)
 
-        # centroids = [(320 + 240)/ 2), ...
-        #     round(bboxes(:, 2) + bboxes(:, 4) / 2)];
-        # points = cv2.reprojectImageTo3D(disp, calib_data['Q']).reshape(-1, 3)
-        # X = points(:, :, 1)
-        # Y = points(:, :, 2)
-        # Z = points(:, :, 3)
-        # centroids3D = [X(centroidsIdx), Y(centroidsIdx), Z(centroidsIdx)]
-
-        #dists = math.sqrt(sum(centroids3D .^ 2, 2))
-
-        image_dim = self.left_color.ndim
-        if (image_dim == 2):  # grayscale
-            colors = self.left_color.reshape(-1, 1)
-        elif (image_dim == 3): #color
-            colors = self.left_color.reshape(-1, 3)
-
-        disp = disp.reshape(-1)
-
-        mask_map = (
-            (disp > disp.min()) &
-            #(disp_arr < disp_arr.max()) &
-            np.all(~np.isnan(points), axis=1) &
-            np.all(~np.isinf(points), axis=1)
-        )
-
-        output_points = points[mask_map]
-        output_colors = colors[mask_map]
-
-        mask = points[:, 2] > points[:, 2].min()
-        coords = points[mask]
-        colors = colors[mask]
-
-        self.output_points = output_points
-        self.output_colors = output_colors
+        # cv.imshow('left', imgL)
+        # cv.imshow('disparity', (disp-min_disp)/num_disp)
+        # cv.waitKey()
 
 
-        pi = self.calc_projected_image(output_points, output_colors, self.r, self.t, calib_data['M1'], rev_proj_matrix, 640, 480)
-        pi = cv2.resize (pi, dsize=(640, 362), interpolation = cv2.INTER_CUBIC)
-        cv2.imshow("3D Map", pi)
+        #pi = self.calc_projected_image(self.output_points, self.output_colors, self.r, self.t, calib_data['M1'], rev_proj_matrix, 640, 480)
+        #pi = cv2.resize (pi, dsize=(640, 362), interpolation = cv2.INTER_CUBIC)
+        #cv2.imshow("3D Map", pi)
 
 
         #points = np.hstack([coordinates, colors])
