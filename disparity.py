@@ -38,6 +38,8 @@ class DisparityCalc(threading.Thread):
         self.speckleRange  = 32
         self.colormap = 4
 
+        self.rightmatcher = True
+
         self.ply_header = (
     '''ply
     format ascii 1.0
@@ -89,7 +91,8 @@ class DisparityCalc(threading.Thread):
         #self.disparity_raw = np.zeros((640, 480, 3), np.int16)
         self.disparity_gray = np.zeros((640, 480, 3), np.int16)
         self.disparity_color = np.zeros((640, 480, 3), np.int16)
-        self.filteredImg = np.zeros((640, 480, 3), np.int16)
+        self.disparity_map = np.zeros((640, 480, 3), np.int16)
+        self.disparity_map_rm = np.zeros((640, 480, 3), np.int16)
         #self.disparity_left_g = np.zeros((640, 480, 3), np.int16)
 
         self.output_points = np.zeros((640, 480, 3), np.int16)
@@ -150,25 +153,14 @@ class DisparityCalc(threading.Thread):
         self.r = r
         self.t = t
 
+    def update_matcher(self):
+        self.rightmatcher = not self.rightmatcher
 
 
-    def wlsfilter(self, disparity_left, disparity_right):
-        wls_filter = cv2.ximgproc.createDisparityWLSFilter(matcher_left=self.stereoSGBM)
-        wls_filter.setLambda(self.lmbda)
-        wls_filter.setSigmaColor(self.sigma)
-
-        filteredImg = wls_filter.filter(disparity_left, self.left_image, None, disparity_right)
-        filteredImg = cv2.normalize(src=filteredImg, dst=filteredImg, beta=1,
-        alpha=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F);
-        filteredImg = np.uint8(filteredImg)
-
-        filteredImg = cv2.applyColorMap(filteredImg,self.colormap)
-
-        return filteredImg
 
     def stereo_depth_map_single(self):
 
-        disparity = self.stereoSGBM.compute(self.left_image, self.right_image)
+        disparity = self.stereoSGBM.compute(self.left_image, self.right_image).astype(np.float32)/16.0
         local_max = disparity.max()
         local_min = disparity.min()
         disparity_grayscale = (disparity-local_min)*(65535.0/(local_max-local_min))
@@ -221,26 +213,55 @@ class DisparityCalc(threading.Thread):
         return disparity_color_l, disparity_fixtype_l, displ, dispr#disparity_grayscale_l, disparity_grayscale_r
 
 
+    def wlsfilter(self, disparity_left, disparity_right):
+        wls_filter = cv2.ximgproc.createDisparityWLSFilter(matcher_left=self.stereoSGBM)
+        #wls_filter.setLambda(self.lmbda)
+        #wls_filter.setSigmaColor(self.sigma)
+
+
+        disparity_map = wls_filter.filter(disparity_left, self.left_image, None, disparity_right)
+        disparity_map = cv2.normalize(src=disparity_map, dst=disparity_map, beta=1,
+        alpha=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F);
+        disparity_map = np.uint8(disparity_map)
+
+        disparity_map = cv2.applyColorMap(disparity_map,self.colormap)
+
+        return disparity_map
+
+
     def run(self):
         while not self.stop_event.is_set():
+
+
 
 
             disparity_color_l, disparity_fixtype_l, disparity_grayscale_l, disparity_grayscale_r = self.stereo_depth_map_stereo()
             #disparity_color_l, disparity_fixtype, disparity_grayscale_l = self.stereo_depth_map_single()
 
 
-            self.filteredImg = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)
-            self.disparity_color =disparity_color_l
-            self.disparity_gray = disparity_fixtype_l#disparity_grayscale_l
+            #self.disparity_map = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l
+            #if(self.rightmatcher):
+            #
+
+            #else:
+
+            #self.disparity_map = disparity_color_l
+            self.disparity_map = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l
+            self.disparity_color = disparity_color_l #
+            self.disparity_gray = disparity_grayscale_l
+
+
+
+
 
     def putDistanceOnImage(self, disp, x=320, y=240):
         dist = self.getDistanceToPoint(320, 240)
         cv2.putText(disp, str(dist)+ " m",
         (5, 120), cv2.FONT_HERSHEY_SIMPLEX,
-            0.8, (255,0,0), 2)
+            0.8, (255,255,255), 2)
         cv2.putText(disp, "Distance",
         (5, 80), cv2.FONT_HERSHEY_SIMPLEX,
-            0.8, (255,0,0), 2)
+            0.8, (255,255,255), 2)
         #cv2.rectangle(disp, (x, y), (x + w, y + h), (255,0,0), 2)
         cv2.circle(disp, (320, 240), 10, (255,255,255),  8)
         cv2.circle(disp, (320, 240), 10, (0,0,0),  4)
@@ -254,9 +275,9 @@ class DisparityCalc(threading.Thread):
     def getDisparityGray(self):
         return self.disparity_gray.copy()
     def getDisparity(self):
-        return self.disparity_color.copy()
+        return self.disparity_map.copy()
     def getFilteredImg(self):
-        return self.filteredImg.copy()
+        return self.disparity_color.copy()
 
 
 
@@ -378,7 +399,7 @@ class DisparityCalc(threading.Thread):
         # my = f_y / 3.67
         #
         # print(f_x, f_y, mx,my, c_x, c_y)
-        distance = 101.1*3.77*3.77*3.67/distance
+        distance = 94.0*3.77*3.77*3.67/distance
         #distance = distance * np.linalg.inv(self.M1) * [x, y, 1]
 
 
@@ -392,6 +413,6 @@ class DisparityCalc(threading.Thread):
 
     def coords_mouse_disp(self, event,x,y,flags,param): #Function measuring distance to object
         if event == cv2.EVENT_LBUTTONDBLCLK: #double leftclick on disparity map (control windwo)
-            #print (x,y,disparitySGBM[y,x],sgbm_filteredImg[y,x])
+            #print (x,y,disparitySGBM[y,x],sgbm_disparity_map[y,x])
             print(self.getDistanceToPoint)
             #return distance

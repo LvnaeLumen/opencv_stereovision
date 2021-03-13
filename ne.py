@@ -181,6 +181,7 @@ def main(argv=sys.argv):
     flagN_POINT = False
     flagX_3D = False
     flagG_DISTCENTER = False
+    flagL_RIGHTMATCHER = True
 
     obj_rects = []
     obj_centers = []
@@ -273,7 +274,7 @@ def main(argv=sys.argv):
 
         #pointcloud.update(r,t,disp, frames[0])
 
-        show_frames = frames[0], frames[1], grays[0], grays[1], frames_lines, disp
+        show_frames = frames[0], frames[1], grays[0], grays[1], frames_lines, fim
         flags = [flagQ_LEFTSOURCE, flagE_RIGHTSOURCE, flagA_LEFTGRAY, flagD_RIGHTGRAY, flagS_LINES, flagW_DISPARITY, flagN_POINT]
 
         if(flagX_3D):
@@ -334,6 +335,8 @@ def main(argv=sys.argv):
             depth_map.writePly()
         elif ch == ord('g'): #distance to center
             flagG_DISTCENTER = not flagG_DISTCENTER
+        elif ch == ord('l'):
+            depth_map.update_matcher()
 
         elif (ch == ord('w')):
             ax, az = -np.pi/8, 0
