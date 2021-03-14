@@ -5,7 +5,7 @@ import camera
 #from pointcloud import PointCloud
 import misc
 from time import gmtime, strftime
-
+import math
 
 lmbda = 80000
 sigma = 1.8
@@ -54,12 +54,6 @@ class DisparityCalc(threading.Thread):
     end_header
     ''')
 
-
-
-
-
-
-
         self.left_color = color_frames[0]
         self.right_color = color_frames[1]
 
@@ -82,10 +76,16 @@ class DisparityCalc(threading.Thread):
         self.M2 = coeffs['M2']
         self.Q = coeffs['Q']
 
-        print('Logitech C920 focal length / calib X focal length / calib Y focal length')
-        print('3.67\t', self.M1[0][0]*4.8/640, self.M1[1][1]*3.6/480)
+        self.P1m = coeffs['P1']
+        self.P2m = coeffs['P2']
 
-        self.focal_length =  self.M1[0][0]*4.8/640
+        f_length = (map_width * 0.5)/(78 * 0.5 * math.pi/180)#3.67* map_width / 4.8 #(map_width * 0.5)/(78 * 0.5 * math.pi/180)
+        print('Logitech C920 focal length / calib X focal length / calib Y focal length')
+        print('3.67\t', f_length,self.M1[0][0], self.Q[2][3]) #*5.14/map_width
+        self.focal_length = f_length
+        #3.67* map_width / 4.8#self.M1[0][0]#self.Q[2][3]#self.M1[0][0]*4.8/map_width
+        #self.focal_length = self.M1[0][0]
+        #self.focal_length =(map_width * 0.5)/(78 * 0.5 * math.pi/180)
 
         self.stereoSGBM = cv2.StereoSGBM_create(
         minDisparity = self.minDisparity,
@@ -101,16 +101,17 @@ class DisparityCalc(threading.Thread):
         mode = cv2.STEREO_SGBM_MODE_SGBM_3WAY
         )
 
+        self.points = np.zeros((map_width*map_height,3),np.int16)
 
-        #self.disparity_raw = np.zeros((640, 480, 3), np.int16)
-        self.disparity_gray = np.zeros((640, 480, 3), np.int16)
-        self.disparity_color = np.zeros((640, 480, 3), np.int16)
-        self.disparity_map = np.zeros((640, 480, 3), np.int16)
-        self.disparity_map_rm = np.zeros((640, 480, 3), np.int16)
-        #self.disparity_left_g = np.zeros((640, 480, 3), np.int16)
+        #self.disparity_raw = np.zeros((map_width, map_height, 3), np.int16)
+        self.disparity_gray = np.zeros((map_width, map_height, 3), np.int16)
+        self.disparity_color = np.zeros((map_width, map_height, 3), np.int16)
+        self.disparity_map = np.zeros((map_width, map_height, 3), np.int16)
+        self.disparity_map_rm = np.zeros((map_width, map_height, 3), np.int16)
+        #self.disparity_left_g = np.zeros((map_width, map_height, 3), np.int16)
 
-        self.output_points = np.zeros((640, 480, 3), np.int16)
-        self.output_colors = np.zeros((640, 480, 3), np.int16)
+        self.output_points = np.zeros((map_width, map_height, 3), np.int16)
+        self.output_colors = np.zeros((map_width, map_height, 3), np.int16)
 
         fs = cv2.FileStorage("extrinsics.yml", cv2.FILE_STORAGE_READ)
         fn = fs.getNode("Q")
@@ -157,11 +158,11 @@ class DisparityCalc(threading.Thread):
     def update_image(self, color_frames, gray_frames):
 
 
-        self.left_color = color_frames[0]#[10:480,100:640]
-        self.right_color = color_frames[1]#[10:480,100:640]
+        self.left_color = color_frames[0]#[10:map_height,100:map_width]
+        self.right_color = color_frames[1]#[10:map_height,100:map_width]
 
-        self.left_image = gray_frames[0]#[10:480,100:640]
-        self.right_image = gray_frames[1]#[10:480,100:640]
+        self.left_image = gray_frames[0]#[10:map_height,100:map_width]
+        self.right_image = gray_frames[1]#[10:map_height,100:map_width]
 
     def update_coords(self, r,t):
         self.r = r
@@ -243,11 +244,11 @@ class DisparityCalc(threading.Thread):
 
     def run(self):
         while not self.stop_event.is_set():
-            #disparity_color_l, disparity_fixtype_l,disparity_fixtype_r, disparity_grayscale_l, disparity_grayscale_r = self.stereo_depth_map_stereo()
-            disparity_color_l, disparity_fixtype_l, disparity_grayscale_l = self.stereo_depth_map_single()
+            disparity_color_l, disparity_fixtype_l,disparity_fixtype_r, disparity_grayscale_l, disparity_grayscale_r = self.stereo_depth_map_stereo()
+            #disparity_color_l, disparity_fixtype_l, disparity_grayscale_l = self.stereo_depth_map_single()
 
-            self.disparity_color = disparity_color_l #
-            #self.disparity_color = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l #
+            #self.disparity_color = disparity_color_l #
+            self.disparity_color = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l #
 
             self.disparity_map = disparity_color_l
 
@@ -255,12 +256,7 @@ class DisparityCalc(threading.Thread):
 
             #self.disparity_color = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l #
             self.disparity_gray = disparity_grayscale_l
-
-
-
-
-
-
+            #self.calculatePointCloud()
 
     def putDistanceOnImage(self, disp, x=320, y=240):
         dist = self.getDistanceToPoint(320, 240)
@@ -322,8 +318,6 @@ class DisparityCalc(threading.Thread):
         # # centroids = [(320 + 240)/ 2), ...
         # #     round(bboxes(:, 2) + bboxes(:, 4) / 2)];
         points = cv2.reprojectImageTo3D(disp, calib_data['Q']).reshape(-1, 3)
-
-
         # # X = points(:, :, 1)
         # # Y = points(:, :, 2)
         # # Z = points(:, :, 3)
@@ -365,8 +359,8 @@ class DisparityCalc(threading.Thread):
         # self.output_colors = colors[mask]
 
 
-        pi = self.calc_projected_image(self.output_points, self.output_colors, self.r, self.t, calib_data['M1'], rev_proj_matrix, 640, 480)
-        pi = cv2.resize (pi, dsize=(640, 480), interpolation = cv2.INTER_CUBIC)
+        #pi = self.calc_projected_image(self.output_points, self.output_colors, self.r, self.t, calib_data['M1'], rev_proj_matrix, map_width, map_height)
+        #pi = cv2.resize (pi, dsize=(map_width, map_height), interpolation = cv2.INTER_CUBIC)
         #cv2.imshow("3D Map", pi)
         #print('e')
 
@@ -400,44 +394,78 @@ class DisparityCalc(threading.Thread):
         self.stop_event.set()
         self._running = False
     def getDistanceToPoint(self,x,y):
-        average=0
-        i=0
-        for u in range (-2,3):
-            for v in range (-2,3):
-                d = self.disparity_gray[y+u,x+v] #using SGBM in area
-                if (average == 0) or (average - d < 5):
-                    average += d
-                i+=1
-        distance=average/i
+        D=self.disparity_gray[y,x]
+        i=1
+        # for u in range (-3,4):
+        #     for v in range (-3,4):
+        #         d = self.disparity_gray[y+u,x+v] #using SGBM in area
+        #         if (d > 0):
+        #             D = D + d
+        #             i+=1
+        D=D/i
 
-        # // compute the real-world distance [mm]
-        # float fMaxDistance = static_cast<float>((1. / Q.at<double>(3, 2)) * Q.at<double>(2, 3));
-        #
-        # // outputDisparityValue is single 16-bit value from disparityMap
-        # // DISP_SCALE = 16
-        # float fDisparity = outputDisparityValue / (float)StereoMatcher::DISP_SCALE;
-        # float fDistance = fMaxDistance / fDisparity;
-
-
-        # f_x = self.M1[0][0]
-        # f_y = self.M1[1][1]
-        # c_x = self.M1[0][2]
-        # c_y = self.M1[1][2]
-        #
-        # mx = f_x / 3.67
-        # my = f_y / 3.67
-        #
-        # print(f_x, f_y, mx,my, c_x, c_y)
-        distance = 94.0*self.focal_length/distance
+        #d = f*T/Z
+        #X = (px-cx)*Z/f, Y = (py- cy)*Z/f, Z = f*T/d,
         #distance = distance * np.linalg.inv(self.M1) * [x, y, 1]
 
+        #distance = self.Q[2][3]/(self.Q[3][2]*distance+self.Q[3][3])
+
+        #X = (px-cx)*Z/f, Y = (py- cy)*Z/f, Z = f*T/d,
+        #Z = self.Q[2][3]/(-self.Q[3][2]*distance)
 
 
-        #distance= -593.97*distance**(3) + 1506.8*distance**(2) - 1373.1*distance + 522.06
-        distance= np.around(distance*0.01,decimals=2)
-        #cubic equation from source (experimental)
-        #distance= np.around(distance*0.01,decimals=2)
-        return distance
+      #   Q = [  1 0 0      -c_x
+            #    0 1 0      -c_y
+      #          0 0 0      f
+      #          0 0 -1/T_x (c_x - c_x')/T_x ]
+
+
+    #    D =
+        # uvD1 = np.array([x,y,D,1])
+        # Q = self.Q
+        # XYZW = Q.dot(uvD1)
+        # #
+        # XYZ = np.array([XYZW[0]/XYZW[3],XYZW[1]/XYZW[3],XYZW[2]/XYZW[3]])
+        # #
+        # print(XYZ)
+        #print(Q[3][2]/Q[2][3]/D)
+        #
+        # Z = XYZ[2]
+
+
+
+        #distance = math.sqrt(XYZ[0]*XYZ[0] +XYZ[1]*XYZ[1] +XYZ[2]*XYZ[2]) ##TODO
+        ###https://stackoverflow.com/questions/23581238/distance-measurement-using-disparity-map
+        #distance = distance*6.0/800
+
+        ##distance = (self.focal_length*6.0/800)*0.94/D
+        #simplest method, yet works with 10-20 cm error. 0.94 = size of logitech C920
+
+        ##distance = -self.P2m[0][3]*0.025/D
+        #P2[0][3] should have been fx*tx, yet it gives 20 cm error from start
+
+        distance = (1/self.Q[3][2])*0.025*self.focal_length/D
+        #Q[3][2] = -1/tx
+        #0.0025 m = length of calibration chessboard square
+
+
+        # The depth and the distance are two slightly different things.
+        # If you use the standard coordinate system for a camera
+        #  (i.e. Z axis along the optical axis, X and Y axis in the directions of the image X and Y axis),
+        #  then a 3D point M = (X, Y, Z) has a distance of sqrt(X²+Y²+Z²) from the optical center and a depth of Z.
+        #   The D in the formula is the depth, not the distance.
+        #
+        # If you want to retrieve the 3D point M = (X, Y, Z) from the depth value,
+        # you need to know the camera matrix K: M = D * inv(K) * [u; v; 1],
+        # where (u, v) are the image coordinates of the point.
+
+
+        #print(self.points)
+
+        distance = np.around(distance,decimals=2)
+
+
+        return distance #self.disparity_gray[y,x]#
 
 
     def coords_mouse_disp(self, event,x,y,flags,param): #Function measuring distance to object

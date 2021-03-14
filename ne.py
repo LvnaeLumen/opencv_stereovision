@@ -277,10 +277,7 @@ def main(argv=sys.argv):
         show_frames = frames[0], frames[1], grays[0], grays[1], frames_lines, fim
         flags = [flagQ_LEFTSOURCE, flagE_RIGHTSOURCE, flagA_LEFTGRAY, flagD_RIGHTGRAY, flagS_LINES, flagW_DISPARITY, flagN_POINT]
 
-        if(flagX_3D):
-            depth_map.calculatePointCloud()
-        else:
-            cv2.destroyWindow('3D Map')
+
 
         if(flagG_DISTCENTER):
             #cv2.imshow("Distance to",
@@ -312,6 +309,11 @@ def main(argv=sys.argv):
             trackerEvent = False
 
         ch = cv2.waitKey(1)
+
+        if(flagX_3D):
+            depth_map.calculatePointCloud()
+        else:
+            cv2.destroyWindow('3D Map')
 
 
 
