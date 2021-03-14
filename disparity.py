@@ -4,6 +4,7 @@ import numpy as np
 import camera
 #from pointcloud import PointCloud
 import misc
+from time import gmtime, strftime
 
 
 lmbda = 80000
@@ -219,7 +220,7 @@ class DisparityCalc(threading.Thread):
         wls_filter.setSigmaColor(self.sigma)
 
 
-        disparity_filtered = wls_filter.filter(disparity_left.copy(), self.left_image, None, disparity_right.copy())
+        disparity_filtered = wls_filter.filter(disparity_left, self.left_image, None, disparity_right)
         disparity_filtered = cv2.normalize(src=disparity_filtered, dst=disparity_filtered, beta=1,alpha=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F);
         disparity_filtered = np.uint8(disparity_filtered)
 
@@ -229,24 +230,11 @@ class DisparityCalc(threading.Thread):
 
     def run(self):
         while not self.stop_event.is_set():
+            #disparity_color_l, disparity_fixtype_l,disparity_fixtype_r, disparity_grayscale_l, disparity_grayscale_r = self.stereo_depth_map_stereo()
+            disparity_color_l, disparity_fixtype_l, disparity_grayscale_l = self.stereo_depth_map_single()
 
-
-
-
-
-
-
-
-            #self.disparity_map = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l
-#            if(self.rightmatcher):
-#
-
-            disparity_color_l, disparity_fixtype_l,disparity_fixtype_r, disparity_grayscale_l, disparity_grayscale_r = self.stereo_depth_map_stereo()
-            #disparity_color_l, disparity_fixtype_l, disparity_grayscale_l = self.stereo_depth_map_single()
-
-            #self.disparity_color = disparity_color_l #
-            #self.disparity_color = self.wlsfilter(disparity_fixtype_l, disparity_fixtype_r)
-            self.disparity_color = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l #
+            self.disparity_color = disparity_color_l #
+            #self.disparity_color = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l #
 
             self.disparity_map = disparity_color_l
 
@@ -288,9 +276,10 @@ class DisparityCalc(threading.Thread):
 
 
 
-    def write_ply(self, fn, verts, colors):
-        verts = verts.reshape(-1, 3)
-        colors = colors.reshape(-1, 3)
+    def write_ply(self):
+        self.calculatePointCloud()
+        verts = self.output_points.reshape(-1, 3)
+        colors = self.output_colors.reshape(-1, 3)
         verts = np.hstack([verts, colors])
         ply_header = '''ply
         format ascii 1.0
@@ -303,31 +292,21 @@ class DisparityCalc(threading.Thread):
         property uchar blue
         end_header
         '''
-        with open(fn, 'wb') as f:
+        with open('./pointclouds/'+strftime("%m%d%H:%M:%S", gmtime())+'.ply', 'wb') as f:
             f.write((ply_header % dict(vert_num=len(verts))).encode('utf-8'))
             np.savetxt(f, verts, fmt='%f %f %f %d %d %d ')
-    #
-    # def writePly(self):
-    #     #verts = self.output_points.reshape(-1, 3)
-    #     #colors = self.output_colors.reshape(-1, 3)
-    #     points = np.hstack([self.output_points, self.output_colors])
-    #     with open('pointcloud.py', 'w') as outfile:
-    #         outfile.write(self.ply_header.format(
-    #                                         vertex_count=len(self.output_points)))
-    #         np.savetxt(outfile, points, '%f %f %f %d %d %d')
-    #     print ("Pointcloud saved")
 
 
     def calculatePointCloud(self):
-        # rev_proj_matrix = np.zeros((4,1)) # to store the output
+        rev_proj_matrix = np.zeros((4,1)) # to store the output
         #
         calib_data = misc.getCalibData()
         #
-        # disp = self.disparity_gray
+        disp = self.disparity_gray.copy()
         #
         # # centroids = [(320 + 240)/ 2), ...
         # #     round(bboxes(:, 2) + bboxes(:, 4) / 2)];
-        # # points = cv2.reprojectImageTo3D(disp, calib_data['Q']).reshape(-1, 3)
+        points = cv2.reprojectImageTo3D(disp, calib_data['Q']).reshape(-1, 3)
         # # X = points(:, :, 1)
         # # Y = points(:, :, 2)
         # # Z = points(:, :, 3)
@@ -335,53 +314,44 @@ class DisparityCalc(threading.Thread):
         #
         # #dists = math.sqrt(sum(centroids3D .^ 2, 2))
         #
-        # image_dim = self.left_color.ndim
-        # if (image_dim == 2):  # grayscale
-        #     colors = self.left_color.reshape(-1, 1)
-        # elif (image_dim == 3): #color
-        #     colors = self.left_color.reshape(-1, 3)
-        #
-        # disp = disp.reshape(-1)
-        #
-        # mask_map = (
-        #     (disp > disp.min()) &
-        #     #(disp_arr < disp_arr.max()) &
-        #     np.all(~np.isnan(points), axis=1) &
-        #     np.all(~np.isinf(points), axis=1)
-        # )
-        #
-        # output_points = points[mask_map]
-        # output_colors = colors[mask_map]
-        #
-        # mask = points[:, 2] > points[:, 2].min()
-        # coords = points[mask]
-        # colors = colors[mask]
-        #
-        # self.output_points = output_points
-        # self.output_colors = output_colors
+        image_dim = self.left_color.ndim
+        if (image_dim == 2):  # grayscale
+            colors = self.left_color.reshape(-1, 1)
+        elif (image_dim == 3): #color
+            colors = self.left_color.reshape(-1, 3)
 
-        h, w = self.left_image.shape[:2]
-        f = 3.67*3.77                         # guess for focal length
-        Q = self.Q
-        points = cv2.reprojectImageTo3D(self.disparity_gray, Q)
-        colors = self.left_color#cv.cvtColor(imgL, cv.COLOR_BGR2RGB)
-        mask = self.disparity_gray > self.disparity_gray.min()
-        self.output_points = points[mask]
-        self.output_colors = colors[mask]
-        out_fn = 'out.ply'
-        self.write_ply(out_fn, self.output_points, self.output_colors)
-        # out_fn = 'out.ply'
-        # write_ply(out_fn, out_points, out_colors)
-        # print('%s saved' % out_fn)
+        disp = disp.reshape(-1)
 
-        # cv.imshow('left', imgL)
-        # cv.imshow('disparity', (disp-min_disp)/num_disp)
-        # cv.waitKey()
+        mask_map = (
+            (disp > disp.min())# &
+            np.all(~np.isnan(points), axis=1) &
+            np.all(~np.isinf(points), axis=1)
+        )
+
+        output_points = points[mask_map]
+        output_colors = colors[mask_map]
+
+        mask = points[:, 2] > points[:, 2].min()
+        coords = points[mask]
+        colors = colors[mask]
+
+        self.output_points = output_points
+        self.output_colors = output_colors
+
+        # h, w = self.left_image.shape[:2]
+        # f = 3.67#*3.77                         # guess for focal length
+        # Q = self.Q
+        # points = cv2.reprojectImageTo3D(self.disparity_gray, Q)
+        # colors = self.left_color#cv.cvtColor(imgL, cv.COLOR_BGR2RGB)
+        # mask = self.disparity_gray > self.disparity_gray.min()
+        # self.output_points = points[mask]
+        # self.output_colors = colors[mask]
 
 
-        #pi = self.calc_projected_image(self.output_points, self.output_colors, self.r, self.t, calib_data['M1'], rev_proj_matrix, 640, 480)
-        #pi = cv2.resize (pi, dsize=(640, 362), interpolation = cv2.INTER_CUBIC)
+        pi = self.calc_projected_image(self.output_points, self.output_colors, self.r, self.t, calib_data['M1'], rev_proj_matrix, 640, 480)
+        pi = cv2.resize (pi, dsize=(640, 480), interpolation = cv2.INTER_CUBIC)
         #cv2.imshow("3D Map", pi)
+        #print('e')
 
 
         #points = np.hstack([coordinates, colors])
@@ -417,9 +387,9 @@ class DisparityCalc(threading.Thread):
         i=0
         for u in range (-2,3):
             for v in range (-2,3):
-                d= self.disparity_gray[y+u,x+v] #using SGBM in area
-                #if (average == 0) or (average - d < 15):
-                average += d
+                d = self.disparity_gray[y+u,x+v] #using SGBM in area
+                if (average == 0) or (average - d < 5):
+                    average += d
                 i+=1
         distance=average/i
 

@@ -331,24 +331,24 @@ def main(argv=sys.argv):
             flagC_CALIB = not flagC_CALIB
         elif ch == ord('x'): #depth map
             flagX_3D = not flagX_3D
-        elif ch == ord('z'): #depth map
-            depth_map.writePly()
+        elif ch == ord('z'): #write to ply
+            depth_map.write_ply()
         elif ch == ord('g'): #distance to center
             flagG_DISTCENTER = not flagG_DISTCENTER
         elif ch == ord('l'):
             depth_map.update_matcher()
 
         elif (ch == ord('w')):
-            ax, az = -np.pi/8, 0
+            ax, az = -np.pi/16, 0
             r = rotate(r, -ax, -az)
         elif (ch == ord('a')):
-            ax, az = 0, np.pi/8
+            ax, az = 0, np.pi/16
             r = rotate(r, -ax, -az)
         elif (ch == ord('s')):
-            ax, az = np.pi/8, 0
+            ax, az = np.pi/16, 0
             r = rotate(r, -ax, -az)
         elif (ch == ord('d')):
-            ax, az = 0, -np.pi/8
+            ax, az = 0, -np.pi/16
             r = rotate(r, -ax, -az)
 
         elif ch == ord('1'):   # decrease camera distance from the point cloud
