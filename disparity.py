@@ -55,6 +55,11 @@ class DisparityCalc(threading.Thread):
     ''')
 
 
+
+
+
+
+
         self.left_color = color_frames[0]
         self.right_color = color_frames[1]
 
@@ -70,9 +75,17 @@ class DisparityCalc(threading.Thread):
 
         coeffs = misc.getCalibData()
 
+        # fx 0 cx
+        # 0 fy cy
+        # 0 0 1
         self.M1 = coeffs['M1']
         self.M2 = coeffs['M2']
         self.Q = coeffs['Q']
+
+        print('Logitech C920 focal length / calib X focal length / calib Y focal length')
+        print('3.67\t', self.M1[0][0]*4.8/640, self.M1[1][1]*3.6/480)
+
+        self.focal_length =  self.M1[0][0]*4.8/640
 
         self.stereoSGBM = cv2.StereoSGBM_create(
         minDisparity = self.minDisparity,
@@ -247,6 +260,8 @@ class DisparityCalc(threading.Thread):
 
 
 
+
+
     def putDistanceOnImage(self, disp, x=320, y=240):
         dist = self.getDistanceToPoint(320, 240)
         cv2.putText(disp, str(dist)+ " m",
@@ -307,6 +322,8 @@ class DisparityCalc(threading.Thread):
         # # centroids = [(320 + 240)/ 2), ...
         # #     round(bboxes(:, 2) + bboxes(:, 4) / 2)];
         points = cv2.reprojectImageTo3D(disp, calib_data['Q']).reshape(-1, 3)
+
+
         # # X = points(:, :, 1)
         # # Y = points(:, :, 2)
         # # Z = points(:, :, 3)
@@ -323,7 +340,7 @@ class DisparityCalc(threading.Thread):
         disp = disp.reshape(-1)
 
         mask_map = (
-            (disp > disp.min())# &
+            (disp > disp.min()) &
             np.all(~np.isnan(points), axis=1) &
             np.all(~np.isinf(points), axis=1)
         )
@@ -331,9 +348,9 @@ class DisparityCalc(threading.Thread):
         output_points = points[mask_map]
         output_colors = colors[mask_map]
 
-        mask = points[:, 2] > points[:, 2].min()
-        coords = points[mask]
-        colors = colors[mask]
+        mask = output_points[:, 2] > output_points[:, 2].min()
+        output_points = output_points[mask]
+        output_colors = output_colors[mask]
 
         self.output_points = output_points
         self.output_colors = output_colors
@@ -411,7 +428,7 @@ class DisparityCalc(threading.Thread):
         # my = f_y / 3.67
         #
         # print(f_x, f_y, mx,my, c_x, c_y)
-        distance = 94.0*3.77*3.77*3.67/distance
+        distance = 94.0*self.focal_length/distance
         #distance = distance * np.linalg.inv(self.M1) * [x, y, 1]
 
 
