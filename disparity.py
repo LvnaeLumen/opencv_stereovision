@@ -6,7 +6,7 @@ import camera
 import misc
 from time import gmtime, strftime
 import math
-
+import open3d as o3d
 lmbda = 80000
 sigma = 1.8
 
@@ -63,6 +63,8 @@ class DisparityCalc(threading.Thread):
         self.lmbda = 80000
         self.sigma = 1.8
 
+        self.last_mean_disparity = 1
+
 
         self.r = np.eye(3)
         self.t = np.array([0, 0.0, 100.5])
@@ -103,12 +105,14 @@ class DisparityCalc(threading.Thread):
 
         self.points = np.zeros((map_width*map_height,3),np.int16)
 
-        #self.disparity_raw = np.zeros((map_width, map_height, 3), np.int16)
-        self.disparity_gray = np.zeros((map_width, map_height, 3), np.int16)
-        self.disparity_color = np.zeros((map_width, map_height, 3), np.int16)
-        self.disparity_map = np.zeros((map_width, map_height, 3), np.int16)
-        self.disparity_map_rm = np.zeros((map_width, map_height, 3), np.int16)
-        #self.disparity_left_g = np.zeros((map_width, map_height, 3), np.int16)
+        #self.disparity_twoway_raw = np.zeros((map_width, map_height, 3), np.int16)
+        self.disparity_twoway_gray = np.zeros((map_width, map_height, 3), np.int16)
+        self.disparity_twoway_color = np.zeros((map_width, map_height, 3), np.int16)
+        self.disparity_twoway_map = np.zeros((map_width, map_height, 3), np.int16)
+        self.disparity_twoway_map_rm = np.zeros((map_width, map_height, 3), np.int16)
+        #self.disparity_twoway_left_g = np.zeros((map_width, map_height, 3), np.int16)
+
+        self.disparity_oneway_color = np.zeros((map_width, map_height, 3), np.int16)
 
         self.output_points = np.zeros((map_width, map_height, 3), np.int16)
         self.output_colors = np.zeros((map_width, map_height, 3), np.int16)
@@ -244,18 +248,19 @@ class DisparityCalc(threading.Thread):
 
     def run(self):
         while not self.stop_event.is_set():
-            disparity_color_l, disparity_fixtype_l,disparity_fixtype_r, disparity_grayscale_l, disparity_grayscale_r = self.stereo_depth_map_stereo()
-            #disparity_color_l, disparity_fixtype_l, disparity_grayscale_l = self.stereo_depth_map_single()
+            #disparity_color_l, disparity_fixtype_l,disparity_fixtype_r, disparity_grayscale_l, disparity_grayscale_r = self.stereo_depth_map_stereo()
+            disparity_color_l, disparity_fixtype_l, disparity_grayscale_l = self.stereo_depth_map_single()
 
-            #self.disparity_color = disparity_color_l #
-            self.disparity_color = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l #
+            self.disparity_twoway_color = disparity_color_l.copy() #
+            #self.disparity_twoway_color = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l #
 
-            self.disparity_map = disparity_color_l
+            self.disparity_twoway_map = disparity_color_l.copy()
 
+            #self.disparity_twoway_color = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l #
+            self.disparity_twoway_gray = disparity_grayscale_l.copy()
 
-
-            #self.disparity_color = self.wlsfilter(disparity_grayscale_l, disparity_grayscale_r)#disparity_color_l #
-            self.disparity_gray = disparity_grayscale_l
+            #
+            self.disparity_oneway_color = disparity_color_l.copy()
             #self.calculatePointCloud()
 
     def putDistanceOnImage(self, disp, x=320, y=240):
@@ -277,11 +282,15 @@ class DisparityCalc(threading.Thread):
 
 
     def getDisparityGray(self):
-        return self.disparity_gray.copy()
+        return self.disparity_twoway_gray.copy()
     def getDisparity(self):
-        return self.disparity_map.copy()
+        return self.disparity_twoway_map.copy()
+
+    def getDisparityOneway(self):
+        return self.disparity_oneway_color.copy()
+
     def getFilteredImg(self):
-        return self.disparity_color.copy()
+        return self.disparity_twoway_color.copy()
 
 
 
@@ -303,9 +312,13 @@ class DisparityCalc(threading.Thread):
         property uchar blue
         end_header
         '''
-        with open('./pointclouds/'+strftime("%m%d%H:%M:%S", gmtime())+'.ply', 'wb') as f:
+        filepath = './pointclouds/'+strftime("%m%d%H:%M:%S", gmtime())+'.ply'
+        with open(filepath, 'wb') as f:
             f.write((ply_header % dict(vert_num=len(verts))).encode('utf-8'))
             np.savetxt(f, verts, fmt='%f %f %f %d %d %d ')
+            pcd = o3d.io.read_point_cloud(filename = filepath, format = "xyz")
+            o3d.io.write_point_cloud('./pointclouds/'+strftime("%m%d%H:%M:%S", gmtime())+".pcd", pcd)
+
 
 
     def calculatePointCloud(self):
@@ -313,7 +326,7 @@ class DisparityCalc(threading.Thread):
         #
         calib_data = misc.getCalibData()
         #
-        disp = self.disparity_gray.copy()
+        disp = self.disparity_twoway_gray.copy()
         #
         # # centroids = [(320 + 240)/ 2), ...
         # #     round(bboxes(:, 2) + bboxes(:, 4) / 2)];
@@ -352,9 +365,9 @@ class DisparityCalc(threading.Thread):
         # h, w = self.left_image.shape[:2]
         # f = 3.67#*3.77                         # guess for focal length
         # Q = self.Q
-        # points = cv2.reprojectImageTo3D(self.disparity_gray, Q)
+        # points = cv2.reprojectImageTo3D(self.disparity_twoway_gray, Q)
         # colors = self.left_color#cv.cvtColor(imgL, cv.COLOR_BGR2RGB)
-        # mask = self.disparity_gray > self.disparity_gray.min()
+        # mask = self.disparity_twoway_gray > self.disparity_twoway_gray.min()
         # self.output_points = points[mask]
         # self.output_colors = colors[mask]
 
@@ -394,15 +407,27 @@ class DisparityCalc(threading.Thread):
         self.stop_event.set()
         self._running = False
     def getDistanceToPoint(self,x,y):
-        D=self.disparity_gray[y,x]
-        i=1
-        # for u in range (-3,4):
-        #     for v in range (-3,4):
-        #         d = self.disparity_gray[y+u,x+v] #using SGBM in area
-        #         if (d > 0):
-        #             D = D + d
-        #             i+=1
-        D=D/i
+
+        D = 0
+        i = 0
+        for u in range (-3,4):
+             for v in range (-3,4):
+                 d = self.disparity_twoway_gray[y+u,x+v] #using SGBM in area
+
+                 if (d != -1.0):
+
+                     D = D + d
+                     i+=1
+        if i == 0:
+            D = self.last_mean_disparity
+
+        else:
+            D=D/i
+            self.last_mean_disparity = D
+
+
+
+
 
         #d = f*T/Z
         #X = (px-cx)*Z/f, Y = (py- cy)*Z/f, Z = f*T/d,
@@ -465,7 +490,7 @@ class DisparityCalc(threading.Thread):
         distance = np.around(distance,decimals=2)
 
 
-        return distance #self.disparity_gray[y,x]#
+        return distance #self.disparity_twoway_gray[y,x]#
 
 
     def coords_mouse_disp(self, event,x,y,flags,param): #Function measuring distance to object

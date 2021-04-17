@@ -182,6 +182,7 @@ def main(argv=sys.argv):
     flagX_3D = False
     flagG_DISTCENTER = False
     flagL_RIGHTMATCHER = True
+    flagO_ONEWAY = False
 
     obj_rects = []
     obj_centers = []
@@ -238,7 +239,7 @@ def main(argv=sys.argv):
 
 
     cv2.setMouseCallback("Disparity",depth_map.coords_mouse_disp,disp)
-    names = ['Left Image', 'Right Image', 'Left Gray Image', 'Right Gray Image', 'Lines', 'Disp', 'Pointcloud']
+    names = ['Left Image', 'Right Image', 'Left Gray Image', 'Right Gray Image', 'Lines', 'Disp', 'DispOneway']
 
     i = 0
 
@@ -269,13 +270,14 @@ def main(argv=sys.argv):
         depth_map.update_image(frames, grays)
         depth_map.update_coords(r,t)
         disp = depth_map.getDisparity()
+        disp_oneway = depth_map.getDisparityOneway()
         fim = depth_map.getFilteredImg()
         #depth = depth_map.getDepthMap()
 
         #pointcloud.update(r,t,disp, frames[0])
 
-        show_frames = frames[0], frames[1], grays[0], grays[1], frames_lines, fim
-        flags = [flagQ_LEFTSOURCE, flagE_RIGHTSOURCE, flagA_LEFTGRAY, flagD_RIGHTGRAY, flagS_LINES, flagW_DISPARITY, flagN_POINT]
+        show_frames = frames[0], frames[1], grays[0], grays[1], frames_lines, fim, disp_oneway
+        flags = [flagQ_LEFTSOURCE, flagE_RIGHTSOURCE, flagA_LEFTGRAY, flagD_RIGHTGRAY, flagS_LINES, flagW_DISPARITY, flagO_ONEWAY]
 
 
 
@@ -339,7 +341,8 @@ def main(argv=sys.argv):
             flagG_DISTCENTER = not flagG_DISTCENTER
         elif ch == ord('l'):
             depth_map.update_matcher()
-
+        elif ch == ord('o'):
+            flagO_ONEWAY = not flagO_ONEWAY
         elif (ch == ord('w')):
             ax, az = -np.pi/16, 0
             r = rotate(r, -ax, -az)
