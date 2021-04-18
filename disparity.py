@@ -80,6 +80,7 @@ class DisparityCalc(threading.Thread):
 
         self.P1m = coeffs['P1']
         self.P2m = coeffs['P2']
+        self.pcd = o3d.geometry.PointCloud()
 
         f_length = (map_width * 0.5)/(78 * 0.5 * math.pi/180)#3.67* map_width / 4.8 #(map_width * 0.5)/(78 * 0.5 * math.pi/180)
         print('Logitech C920 focal length / calib X focal length / calib Y focal length')
@@ -294,8 +295,6 @@ class DisparityCalc(threading.Thread):
 
 
 
-
-
     def write_ply(self):
         self.calculatePointCloud()
         verts = self.output_points.reshape(-1, 3)
@@ -312,13 +311,20 @@ class DisparityCalc(threading.Thread):
         property uchar blue
         end_header
         '''
-        filepath = './pointclouds/'+strftime("%m%d%H:%M:%S", gmtime())+'.ply'
+        name = './pointclouds/'+strftime("%m%d%H:%M:%S", gmtime())
+        filepath = name+'.ply'
         with open(filepath, 'wb') as f:
             f.write((ply_header % dict(vert_num=len(verts))).encode('utf-8'))
             np.savetxt(f, verts, fmt='%f %f %f %d %d %d ')
-            pcd = o3d.io.read_point_cloud(filename = filepath, format = "xyz")
-            o3d.io.write_point_cloud('./pointclouds/'+strftime("%m%d%H:%M:%S", gmtime())+".pcd", pcd)
 
+            pcd = o3d.io.read_point_cloud(filename = filepath, format = "ply")
+
+            o3d.visualization.draw_geometries(geometry_list=[pcd], width = 640, height = 480)
+            o3d.io.write_point_cloud(write_ascii=True, filename=name+".pcd", pointcloud = pcd)
+
+    def show3DPCloud(self):
+
+        self.write_ply();
 
 
     def calculatePointCloud(self):
@@ -410,8 +416,8 @@ class DisparityCalc(threading.Thread):
 
         D = 0
         i = 0
-        for u in range (-3,4):
-             for v in range (-3,4):
+        for u in range (-1,2):
+             for v in range (-1,2):
                  d = self.disparity_twoway_gray[y+u,x+v] #using SGBM in area
 
                  if (d != -1.0):
