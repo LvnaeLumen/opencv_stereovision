@@ -57,10 +57,7 @@ def main(argv=sys.argv):
         frames= cameras.getFrames(False)
         grays = getGrays(frames)
 
-
         check = redrawCams(frames, grays, flagS_Ch)
-        
-
 
         ch = cv2.waitKey(1)
         if ch == ord('s'):

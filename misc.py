@@ -5,7 +5,7 @@ def getCalibData():
     ret = dict()
 
 
-    fs = cv2.FileStorage("extrinsics.yml", cv2.FILE_STORAGE_READ)
+    fs = cv2.FileStorage("calibdata.yaml", cv2.FILE_STORAGE_READ)
     fn = fs.getNode("R")
     R = fn.mat()
 
@@ -23,21 +23,9 @@ def getCalibData():
     R2 = fn.mat()
     ret['R2'] = R2
 
-    fn = fs.getNode("P1")
-    P1 = fn.mat()
-    ret['P1'] = P1
-
-    fn = fs.getNode("P2")
-    P2 = fn.mat()
-    ret['P2'] = P2
-
     fn = fs.getNode("Q")
     Q = fn.mat()
     ret['Q'] = Q
-
-    fs.release()
-
-    fs = cv2.FileStorage("intrinsics.yml", cv2.FILE_STORAGE_READ)
 
     fn = fs.getNode("M1")
     M1 = fn.mat()

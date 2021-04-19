@@ -78,8 +78,6 @@ class DisparityCalc(threading.Thread):
         self.M2 = coeffs['M2']
         self.Q = coeffs['Q']
 
-        self.P1m = coeffs['P1']
-        self.P2m = coeffs['P2']
         self.pcd = o3d.geometry.PointCloud()
 
         f_length = (map_width * 0.5)/(78 * 0.5 * math.pi/180)#3.67* map_width / 4.8 #(map_width * 0.5)/(78 * 0.5 * math.pi/180)
@@ -312,12 +310,12 @@ class DisparityCalc(threading.Thread):
         end_header
         '''
         name = './pointclouds/'+strftime("%m%d%H:%M:%S", gmtime())
-        filepath = name+'.ply'
+        filepath = name+'.pcd'
         with open(filepath, 'wb') as f:
             f.write((ply_header % dict(vert_num=len(verts))).encode('utf-8'))
             np.savetxt(f, verts, fmt='%f %f %f %d %d %d ')
 
-            pcd = o3d.io.read_point_cloud(filename = filepath, format = "ply")
+            pcd = o3d.io.read_point_cloud(filename = filepath, format = "xyz")
 
             o3d.visualization.draw_geometries(geometry_list=[pcd], width = 640, height = 480)
             o3d.io.write_point_cloud(write_ascii=True, filename=name+".pcd", pointcloud = pcd)
@@ -358,12 +356,12 @@ class DisparityCalc(threading.Thread):
             np.all(~np.isinf(points), axis=1)
         )
 
-        output_points = points[mask_map]
-        output_colors = colors[mask_map]
+        output_points = points#[mask_map]
+        output_colors = colors#[mask_map]
 
-        mask = output_points[:, 2] > output_points[:, 2].min()
-        output_points = output_points[mask]
-        output_colors = output_colors[mask]
+        # mask = output_points[:, 2] > output_points[:, 2].min()
+        # output_points = output_points[mask]
+        # output_colors = output_colors[mask]
 
         self.output_points = output_points
         self.output_colors = output_colors
@@ -413,7 +411,6 @@ class DisparityCalc(threading.Thread):
         self.stop_event.set()
         self._running = False
     def getDistanceToPoint(self,x,y):
-
         D = 0
         i = 0
         for u in range (-1,2):
@@ -430,10 +427,6 @@ class DisparityCalc(threading.Thread):
         else:
             D=D/i
             self.last_mean_disparity = D
-
-
-
-
 
         #d = f*T/Z
         #X = (px-cx)*Z/f, Y = (py- cy)*Z/f, Z = f*T/d,

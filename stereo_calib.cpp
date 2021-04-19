@@ -17,11 +17,8 @@
    OPENCV WEBSITES:
      Homepage:      http://opencv.org
      Online docs:   http://docs.opencv.org
-     Q&A forum:     http://answers.opencv.org
      GitHub:        https://github.com/opencv/opencv/
    ************************************************** */
-//g++ stereo_calib.cpp -o em `pkg-config --cflags --libs opencv4`
-//./em -nr -num 15
 
 #include "opencv2/calib3d.hpp"
 #include "opencv2/imgcodecs.hpp"
@@ -36,8 +33,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
-
-#include <dirent.h>
 
 using namespace cv;
 using namespace std;
@@ -59,9 +54,13 @@ static int print_help(char** argv)
 
 
 static void
-StereoCalib(int num, Size boardSize, float squareSize, bool displayCorners = true, bool useCalibrated=true, bool showRectified=true)
+StereoCalib(const vector<string>& imagelist, Size boardSize, float squareSize, bool displayCorners = false, bool useCalibrated=true, bool showRectified=true)
 {
-
+    if( imagelist.size() % 2 != 0 )
+    {
+        cout << "Error: the image list contains odd (non-even) number of elements\n";
+        return;
+    }
 
     const int maxScale = 2;
     // ARRAY AND VECTOR STORAGE:
@@ -69,54 +68,30 @@ StereoCalib(int num, Size boardSize, float squareSize, bool displayCorners = tru
     vector<vector<Point2f> > imagePoints[2];
     vector<vector<Point3f> > objectPoints;
     Size imageSize;
-    string filename;
 
-    string left, right;
-
-    int i, j, k, nimages = num;
+    int i, j, k, nimages = (int)imagelist.size()/2;
 
     imagePoints[0].resize(nimages);
     imagePoints[1].resize(nimages);
     vector<string> goodImageList;
 
-
     for( i = j = 0; i < nimages; i++ )
     {
-
         for( k = 0; k < 2; k++ )
         {
-
-            if (k == 0)
-            {
-              filename = "./output/left"+std::to_string(i)+".jpg";
-            }
-            else
-            {
-
-              filename = "./output/right"+std::to_string(i)+".jpg";
-            }
-
-
-
+            const string& filename = imagelist[i*2+k];
             Mat img = imread(filename, 0);
             if(img.empty())
-            {
-                j--;
                 break;
-            }
-
             if( imageSize == Size() )
                 imageSize = img.size();
             else if( img.size() != imageSize )
             {
-                j--;
                 cout << "The image " << filename << " has the size different from the first image size. Skipping the pair\n";
-
                 break;
             }
             bool found = false;
             vector<Point2f>& corners = imagePoints[k][j];
-            //vector<Point2f> corners;
             for( int scale = 1; scale <= maxScale; scale++ )
             {
                 Mat timg;
@@ -124,24 +99,21 @@ StereoCalib(int num, Size boardSize, float squareSize, bool displayCorners = tru
                     timg = img;
                 else
                     resize(img, timg, Size(), scale, scale, INTER_LINEAR_EXACT);
-                //imshow("src", timg);
-                //char c = (char)waitKey(500);
                 found = findChessboardCorners(timg, boardSize, corners,
                     CALIB_CB_ADAPTIVE_THRESH | CALIB_CB_NORMALIZE_IMAGE);
-
                 if( found )
                 {
-
                     if( scale > 1 )
                     {
                         Mat cornersMat(corners);
                         cornersMat *= 1./scale;
                     }
+                    break;
                 }
             }
-            if( showRectified)
+            if( displayCorners )
             {
-
+                cout << filename << endl;
                 Mat cimg, cimg1;
                 cvtColor(img, cimg, COLOR_GRAY2BGR);
                 drawChessboardCorners(cimg, boardSize, corners, found);
@@ -152,25 +124,21 @@ StereoCalib(int num, Size boardSize, float squareSize, bool displayCorners = tru
                 if( c == 27 || c == 'q' || c == 'Q' ) //Allow ESC to quit
                     exit(-1);
             }
-            //else
-              //  putchar('#');
+            else
+                putchar('.');
             if( !found )
-            {
-                cout << "The image " << filename << " error finding corners\n";
-                j--;
                 break;
-            }
             cornerSubPix(img, corners, Size(11,11), Size(-1,-1),
                          TermCriteria(TermCriteria::COUNT+TermCriteria::EPS,
                                       30, 0.01));
-
-            goodImageList.push_back(filename);
-            cout << filename << endl;
-
         }
-        j++;
+        if( k == 2 )
+        {
+            goodImageList.push_back(imagelist[i*2]);
+            goodImageList.push_back(imagelist[i*2+1]);
+            j++;
+        }
     }
-
     cout << j << " pairs have been successfully detected.\n";
     nimages = j;
     if( nimages < 2 )
@@ -182,7 +150,6 @@ StereoCalib(int num, Size boardSize, float squareSize, bool displayCorners = tru
     imagePoints[0].resize(nimages);
     imagePoints[1].resize(nimages);
     objectPoints.resize(nimages);
-    cout << "Successfully resized point arrays\n";
 
     for( i = 0; i < nimages; i++ )
     {
@@ -198,7 +165,6 @@ StereoCalib(int num, Size boardSize, float squareSize, bool displayCorners = tru
     cameraMatrix[1] = initCameraMatrix2D(objectPoints,imagePoints[1],imageSize,0);
     Mat R, T, E, F;
 
-    cout << "Initialized Camera Matrixes\n";
     double rms = stereoCalibrate(objectPoints, imagePoints[0], imagePoints[1],
                     cameraMatrix[0], distCoeffs[0],
                     cameraMatrix[1], distCoeffs[1],
@@ -359,62 +325,47 @@ StereoCalib(int num, Size boardSize, float squareSize, bool displayCorners = tru
 }
 
 
-static bool readStringList( vector<string>& l )
+static bool readStringList( const string& filename, vector<string>& l )
 {
     l.resize(0);
-    /*FileStorage fs(filename, FileStorage::READ);
-
+    FileStorage fs(filename, FileStorage::READ);
     if( !fs.isOpened() )
         return false;
-
     FileNode n = fs.getFirstTopLevelNode();
     if( n.type() != FileNode::SEQ )
         return false;
     FileNodeIterator it = n.begin(), it_end = n.end();
     for( ; it != it_end; ++it )
-
-        cout << (string)*it << endl;
         l.push_back((string)*it);
-        */
-    DIR* dpdf = opendir("./output");
-    struct dirent *epdf;
-    if (dpdf != NULL) {
-       while (epdf = readdir(dpdf)) {
-          l.push_back(std::string(epdf->d_name));
-       }
-    }
-    closedir(dpdf);
-
     return true;
 }
 
 int main(int argc, char** argv)
 {
-    Size boardSize(6,9);
+    Size boardSize;
     string imagelistfn;
     bool showRectified;
-    cv::CommandLineParser parser(argc, argv, "{num|16|}{s|1.0|}{nr||}{help||}");
+    cv::CommandLineParser parser(argc, argv, "{w|9|}{h|6|}{s|1.0|}{nr||}{help||}{@input|stereo_calib.xml|}");
     if (parser.has("help"))
         return print_help(argv);
     showRectified = !parser.has("nr");
-
-
-    float squareSize = 1.0;//parser.get<float>("s");
-    int num = parser.get<int>("num");
-    num -=  1;
+    imagelistfn = samples::findFile(parser.get<string>("@input"));
+    boardSize.width = parser.get<int>("w");
+    boardSize.height = parser.get<int>("h");
+    float squareSize = parser.get<float>("s");
     if (!parser.check())
     {
         parser.printErrors();
         return 1;
     }
     vector<string> imagelist;
-    bool ok = readStringList(imagelist);
+    bool ok = readStringList(imagelistfn, imagelist);
     if(!ok || imagelist.empty())
     {
         cout << "can not open " << imagelistfn << " or the string list is empty" << endl;
         return print_help(argv);
     }
 
-    StereoCalib(num,  boardSize, squareSize, false, true, showRectified);
+    StereoCalib(imagelist, boardSize, squareSize, false, true, showRectified);
     return 0;
 }
