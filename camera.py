@@ -1,6 +1,7 @@
 import cv2
 import threading
 import yaml
+import misc
 
 
 class CameraAsyncReading(threading.Thread):
@@ -122,45 +123,21 @@ def CalibInfo(colored, gray):
 
 
 def CalibrateFromFile(HEIGHT, WIDTH):
-    fs = cv2.FileStorage("extrinsics.yml", cv2.FILE_STORAGE_READ)
-    fn = fs.getNode("R")
-    R = fn.mat()
+    coeffs = misc.getCalibData()
 
-    fn = fs.getNode("T")
-    T = fn.mat()
+    
+    R = coeffs['R']
+    T = coeffs['T']
+    R1 = coeffs['R1']
+    R2 = coeffs['R2']
+    P1 = coeffs['P1']
+    P2 = coeffs['P2']
+    Q = coeffs['Q']
+    M1 = coeffs['M1']
+    D1 = coeffs['D1']
+    M2 = coeffs['M2']
+    D2 = coeffs['D2']
 
-    fn = fs.getNode("R1")
-    R1 = fn.mat()
-
-    fn = fs.getNode("R2")
-    R2 = fn.mat()
-
-    fn = fs.getNode("P1")
-    P1 = fn.mat()
-
-    fn = fs.getNode("P2")
-    P2 = fn.mat()
-
-    fn = fs.getNode("Q")
-    Q = fn.mat()
-
-    fs.release()
-
-    fs = cv2.FileStorage("intrinsics.yml", cv2.FILE_STORAGE_READ)
-
-    fn = fs.getNode("M1")
-    M1 = fn.mat()
-
-    fn = fs.getNode("D1")
-    D1 = fn.mat()
-
-    fn = fs.getNode("M2")
-    M2 = fn.mat()
-
-    fn = fs.getNode("D2")
-    D2 = fn.mat()
-
-    fs.release()
 
     leftMapX, leftMapY = cv2.initUndistortRectifyMap(M1, D1, R1, P1,
                                              (HEIGHT, WIDTH), cv2.CV_16SC2)   # cv2.CV_16SC2 this format enables us the programme to work faster

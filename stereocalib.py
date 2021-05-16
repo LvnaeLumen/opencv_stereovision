@@ -133,7 +133,7 @@ def stereo_calibrate(left_file, right_file, dir, left_prefix, right_prefix, imag
     flag = 0
     flags = (cv2.CALIB_FIX_PRINCIPAL_POINT | cv2.CALIB_FIX_ASPECT_RATIO | cv2.CALIB_FIX_FOCAL_LENGTH |
              cv2.CALIB_FIX_INTRINSIC | cv2.CALIB_FIX_K3 | cv2.CALIB_FIX_K4 | cv2.CALIB_FIX_K5 |
-             cv2.CALIB_FIX_K6)
+             cv2.CALIB_FIX_K6 | cv2.CALIB_USE_INTRINSIC_GUESS)
 
 
     ret, M1, D1, M2, D2, R, T, E, F = cv2.stereoCalibrate(objp, leftp, rightp, M1, D1, M2, D2, image_size)

@@ -23,6 +23,14 @@ def getCalibData():
     R2 = fn.mat()
     ret['R2'] = R2
 
+    fn = fs.getNode("P1")
+    P1 = fn.mat()
+    ret['P1'] = P1
+
+    fn = fs.getNode("P2")
+    P2 = fn.mat()
+    ret['P2'] = P2
+
     fn = fs.getNode("Q")
     Q = fn.mat()
     ret['Q'] = Q

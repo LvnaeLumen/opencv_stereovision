@@ -71,6 +71,8 @@ class DisparityCalc(threading.Thread):
 
         coeffs = misc.getCalibData()
 
+        self.target_points = []
+
         # fx 0 cx
         # 0 fy cy
         # 0 0 1
@@ -80,7 +82,7 @@ class DisparityCalc(threading.Thread):
 
         self.pcd = o3d.geometry.PointCloud()
 
-        f_length = (map_width * 0.5)/(78 * 0.5 * math.pi/180)#3.67* map_width / 4.8 #(map_width * 0.5)/(78 * 0.5 * math.pi/180)
+        f_length = self.Q[2][3]#(map_width * 0.5)/(78 * 0.5 * math.pi/180)#3.67* map_width / 4.8 #(map_width * 0.5)/(78 * 0.5 * math.pi/180)
         print('Logitech C920 focal length / calib X focal length / calib Y focal length')
         print('3.67\t', f_length,self.M1[0][0], self.Q[2][3]) #*5.14/map_width
         self.focal_length = f_length
@@ -262,22 +264,6 @@ class DisparityCalc(threading.Thread):
             self.disparity_oneway_color = disparity_color_l.copy()
             #self.calculatePointCloud()
 
-    def putDistanceOnImage(self, disp, x=320, y=240):
-        dist = self.getDistanceToPoint(320, 240)
-        cv2.putText(disp, str(dist)+ " m",
-        (5, 120), cv2.FONT_HERSHEY_SIMPLEX,
-            0.8, (255,255,255), 2)
-        cv2.putText(disp, "Distance",
-        (5, 80), cv2.FONT_HERSHEY_SIMPLEX,
-            0.8, (255,255,255), 2)
-        #cv2.rectangle(disp, (x, y), (x + w, y + h), (255,0,0), 2)
-        cv2.circle(disp, (320, 240), 10, (255,255,255),  8)
-        cv2.circle(disp, (320, 240), 10, (0,0,0),  4)
-
-        return disp
-
-
-
 
 
     def getDisparityGray(self):
@@ -410,6 +396,27 @@ class DisparityCalc(threading.Thread):
 
         self.stop_event.set()
         self._running = False
+
+    
+    def putDistanceOnImage(self, disp):
+        i = 0
+        #cv2.putText(disp, "Distance",
+        #    (5, 80), cv2.FONT_HERSHEY_SIMPLEX,
+        #        0.8, (255,255,255), 2)
+
+        for point in self.target_points:
+            dist = self.getDistanceToPoint(point[0], point[1])
+            cv2.putText(disp, str(dist)+ " m",
+            (point[0]+20, point[1]+20), cv2.FONT_HERSHEY_SIMPLEX,
+                0.5, (255,255,255), 2)
+            
+            #cv2.rectangle(disp, (x, y), (x + w, y + h), (255,0,0), 2)
+            cv2.circle(disp, (point[0], point[1]), 5, (255,255,255),  4)
+            cv2.circle(disp, (point[0], point[1]), 5, (0,0,0),  2)
+
+        return disp
+
+
     def getDistanceToPoint(self,x,y):
         D = 0
         i = 0
@@ -468,7 +475,8 @@ class DisparityCalc(threading.Thread):
         ##distance = -self.P2m[0][3]*0.025/D
         #P2[0][3] should have been fx*tx, yet it gives 20 cm error from start
 
-        distance = (1/self.Q[3][2])*0.025*self.focal_length/D
+        # dist = B * f / (disp * px)
+        distance = (1/self.Q[3][2])*self.Q[2][3]/D #*0.025
         #Q[3][2] = -1/tx
         #0.0025 m = length of calibration chessboard square
 
@@ -492,8 +500,15 @@ class DisparityCalc(threading.Thread):
         return distance #self.disparity_twoway_gray[y,x]#
 
 
+
+    
+
+
     def coords_mouse_disp(self, event,x,y,flags,param): #Function measuring distance to object
         if event == cv2.EVENT_LBUTTONDBLCLK: #double leftclick on disparity map (control windwo)
+            self.target_points.append([x,y])
             #print (x,y,disparitySGBM[y,x],sgbm_disparity_map[y,x])
-            print(self.getDistanceToPoint)
+            #print(self.getDistanceToPoint)
+
+            
             #return distance
