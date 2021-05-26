@@ -18,12 +18,12 @@ class CameraAsyncReading(threading.Thread):
         self.HEIGHT = height
         self.WIDTH = width
 
-        self.video_capture_0 = cv2.VideoCapture(cams[0], cv2.CAP_V4L2)
+        self.video_capture_0 = cv2.VideoCapture(cams[1], cv2.CAP_V4L2)
         self.video_capture_0.set(cv2.CAP_PROP_FRAME_WIDTH, self.HEIGHT)
         self.video_capture_0.set(cv2.CAP_PROP_FRAME_HEIGHT, self.WIDTH)
         self.video_capture_0.set(cv2.CAP_PROP_AUTOFOCUS, 0)
 
-        self.video_capture_1 = cv2.VideoCapture(cams[1], cv2.CAP_V4L2)
+        self.video_capture_1 = cv2.VideoCapture(cams[0], cv2.CAP_V4L2)
         self.video_capture_1.set(cv2.CAP_PROP_FRAME_WIDTH, self.HEIGHT)
         self.video_capture_1.set(cv2.CAP_PROP_FRAME_HEIGHT, self.WIDTH)
         self.video_capture_1.set(cv2.CAP_PROP_AUTOFOCUS, 0)
@@ -52,6 +52,7 @@ class CameraAsyncReading(threading.Thread):
             self.video_capture_1.grab()
             _, self.frame0 = self.video_capture_0.retrieve()
             _, self.frame1 = self.video_capture_1.retrieve()
+            
 
 
 
@@ -67,6 +68,11 @@ class CameraAsyncReading(threading.Thread):
         else:
             frame_left = self.frame0
             frame_right = self.frame1
+
+        
+        frame_left = frame_left[60:400, 80:580]
+        frame_right = frame_right[60:400, 80:580]
+
 
         return [frame_left, frame_right]
     def stop(self):

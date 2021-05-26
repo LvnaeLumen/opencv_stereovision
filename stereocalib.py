@@ -26,10 +26,10 @@ def calibrate(prefix, dirpath='./output', image_format='jpg', square_size = 0.02
         dirpath = dirpath[:-1]
 
     # Get the images
-    print(prefix)
-    print(dirpath+'/' + prefix + '*.' + image_format)
+    #print(prefix)
+    #print(dirpath+'/' + prefix + '*.' + image_format)
     images = glob.glob(dirpath+'/' + prefix + '*.' + image_format)
-    print(images)
+    #print(images)
     gray = np.zeros((height*width, 3), np.float32)
 
     # Iterate through the pairs and find chessboard corners. Add them to arrays
@@ -177,6 +177,9 @@ def load_image_points(dir, left_prefix,  right_prefix,  image_format, square_siz
     left_images.sort()
     right_images.sort()
 
+    print(left_images)
+    print(right_images)
+
 
 
     # Pairs should be same size. Otherwise we have sync problem.
@@ -192,6 +195,16 @@ def load_image_points(dir, left_prefix,  right_prefix,  image_format, square_siz
     # Iterate through the pairs and find chessboard corners. Add them to arrays
     # If openCV can't find the corners in one image, we discard the pair.
     for left_im, right_im in pair_images:
+        
+        left_name_check = left_im.replace('.','/')
+        left_name_check = left_name_check.split('/')[3][4:]
+        right_name_check = right_im.replace('.','/')
+        right_name_check = right_name_check.split('/')[3][5:]
+        
+
+        if (left_name_check != right_name_check):
+            continue
+        #print(left_name_check, right_name_check)
         print(left_im, right_im)
         # Right Object Points
         right = cv2.imread(right_im)

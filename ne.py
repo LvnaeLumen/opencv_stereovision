@@ -73,6 +73,8 @@ def getTrackbarValues():
         num_disp = 16
     num_disp = int( 16 * round( num_disp / 16. )) #fool protection
 
+    print(num_disp)
+
     return (sgbm_mode, min_disp, num_disp, block_size, window_size, focus_len, color_map, new_wls_lambda, new_wls_sigma, wls_vismult)
 
 def getTrackbarValuesRaw():
@@ -283,8 +285,8 @@ def main(argv=sys.argv):
         if(flagG_DISTCENTER):
             #cv2.imshow("Distance to",
             depth_map.putDistanceOnImage(disp)#)
-            cv2.circle(frames[0], (320, 240), 10, (255,255,255),  8)
-            cv2.circle(frames[0], (320, 240), 10, (0,0,0),  4)
+            #cv2.circle(frames[0], (320, 240), 10, (255,255,255),  8)
+            #cv2.circle(frames[0], (320, 240), 10, (0,0,0),  4)
 
         #else:
             #cv2.destroyWindow("Distance to")

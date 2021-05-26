@@ -81,14 +81,21 @@ class DisparityCalc(threading.Thread):
         self.Q = coeffs['Q']
 
         self.pcd = o3d.geometry.PointCloud()
-
-        f_length = self.Q[2][3]#(map_width * 0.5)/(78 * 0.5 * math.pi/180)#3.67* map_width / 4.8 #(map_width * 0.5)/(78 * 0.5 * math.pi/180)
-        print('Logitech C920 focal length / calib X focal length / calib Y focal length')
-        print('3.67\t', f_length,self.M1[0][0], self.Q[2][3]) #*5.14/map_width
+        #self.Q[2][3]#
+        f_length = (map_width * 0.5)/(78 * 0.5 * math.pi/180)#3.67* map_width / 4.8 #(map_width * 0.5)/(78 * 0.5 * math.pi/180)
+        
         self.focal_length = f_length
+        self.baseline = np.around((1/self.Q[3][2]),decimals=4) 
+        
+
+        print("Baseline = ", self.baseline, " m")
         #3.67* map_width / 4.8#self.M1[0][0]#self.Q[2][3]#self.M1[0][0]*4.8/map_width
         #self.focal_length = self.M1[0][0]
         #self.focal_length =(map_width * 0.5)/(78 * 0.5 * math.pi/180)
+
+        #print('Logitech C920 focal length / calib X focal length / calib Y focal length')
+        #print('3.67\t', f_length,self.M1[0][0], self.Q[2][3]) #*5.14/map_width
+
 
         self.stereoSGBM = cv2.StereoSGBM_create(
         minDisparity = self.minDisparity,
@@ -342,12 +349,12 @@ class DisparityCalc(threading.Thread):
             np.all(~np.isinf(points), axis=1)
         )
 
-        output_points = points#[mask_map]
-        output_colors = colors#[mask_map]
+        output_points = points[mask_map]
+        output_colors = colors[mask_map]
 
-        # mask = output_points[:, 2] > output_points[:, 2].min()
-        # output_points = output_points[mask]
-        # output_colors = output_colors[mask]
+        mask = output_points[:, 2] > output_points[:, 2].min()
+        output_points = output_points[mask]
+        output_colors = output_colors[mask]
 
         self.output_points = output_points
         self.output_colors = output_colors
@@ -409,12 +416,35 @@ class DisparityCalc(threading.Thread):
             cv2.putText(disp, str(dist)+ " m",
             (point[0]+20, point[1]+20), cv2.FONT_HERSHEY_SIMPLEX,
                 0.5, (255,255,255), 2)
+            dis = self.getDisparityInPoint(point[0], point[1])
+            cv2.putText(disp, str(dis),
+            (point[0]+20, point[1]+40), cv2.FONT_HERSHEY_SIMPLEX,
+                0.5, (255,255,255), 2)
             
             #cv2.rectangle(disp, (x, y), (x + w, y + h), (255,0,0), 2)
             cv2.circle(disp, (point[0], point[1]), 5, (255,255,255),  4)
             cv2.circle(disp, (point[0], point[1]), 5, (0,0,0),  2)
 
         return disp
+    
+    def getDisparityInPoint(self, x, y):
+        D = 0
+        i = 0
+        for u in range (-1,2):
+             for v in range (-1,2):
+                 d = self.disparity_twoway_gray[y+u,x+v] #using SGBM in area
+
+                 if (d != -1.0):
+
+                     D = D + d
+                     i+=1
+        if i == 0:
+            D = self.last_mean_disparity
+
+        else:
+            D=D/i
+            self.last_mean_disparity = D
+        return np.around(D,decimals=2)
 
 
     def getDistanceToPoint(self,x,y):
@@ -434,6 +464,12 @@ class DisparityCalc(threading.Thread):
         else:
             D=D/i
             self.last_mean_disparity = D
+
+        distance = self.baseline*self.focal_length/D#*0.025
+
+        distance = np.around(distance,decimals=2)
+
+        return distance #self.disparity_twoway_gray[y,x]#
 
         #d = f*T/Z
         #X = (px-cx)*Z/f, Y = (py- cy)*Z/f, Z = f*T/d,
@@ -476,7 +512,7 @@ class DisparityCalc(threading.Thread):
         #P2[0][3] should have been fx*tx, yet it gives 20 cm error from start
 
         # dist = B * f / (disp * px)
-        distance = (1/self.Q[3][2])*self.Q[2][3]/D #*0.025
+        
         #Q[3][2] = -1/tx
         #0.0025 m = length of calibration chessboard square
 
@@ -494,10 +530,7 @@ class DisparityCalc(threading.Thread):
 
         #print(self.points)
 
-        distance = np.around(distance,decimals=2)
-
-
-        return distance #self.disparity_twoway_gray[y,x]#
+        
 
 
 
